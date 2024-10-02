@@ -1,0 +1,9 @@
+# TODO
+
+[ ] Create a CLI to directly run Python code without putting the decorator
+[ ] Hide the traceback for SyntaxError
+[ ] Test on `async def`, `async for`
+[ ] Fix the line number in the traceback/code when a modified function is ran
+[ ] Make a custom inheritant of `SyntaxError`
+[ ] Add support for `lambda` functions
+[ ] Look at the support for having the `enable_breakall` decorator named differently
