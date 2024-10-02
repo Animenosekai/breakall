@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "breakall"
+version = "1.0rc1"
+description = "Break from multiple loops at once in Python"
+license = "MIT License"
+authors = ["Animenosekai <animenosekai.mail@gmail.com>"]
+maintainers = ["Animenosekai <animenosekai.mail@gmail.com>"]
+readme = "README.md"
+repository = "https://github.com/Animenosekai/breakall"
+documentation = "https://github.com/Animenosekai/breakall/blob/main/README.md"
+keywords = ["animenosekai", "breakall", "loops", "break"]
+classifiers = [
+    # Status
+    "Development Status :: 3 - Alpha",
+
+    # Audience
+    "Intended Audience :: Developers",
+
+    # Licensing
+    "License :: OSI Approved :: MIT License",
+
+    # Software Requirements
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+
+    # Code quality
+    "Typing :: Typed",
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.scripts]
+breakall = 'breakall.__main__:entry'
+
+[tool.poetry.urls]
+"Issue Tracker" = "https://github.com/Animenosekai/breakall/issues"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.11"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -40,7 +40,7 @@
 
 You will need Python +3.9 to run this module
 
-```
+```bash
 # vermin output
 Minimum required versions: 3.9
 Incompatible versions:     2

@@ -450,6 +450,16 @@ def fix_source(
 
 def enable_breakall(func: typing.Callable):
     """
+    Enables the `breakall` statement on the given function
+
+    Example
+    -------
+    >>> @enable_breakall
+    ... def test():
+    ...     for i in range(10):
+    ...         for j in range(10):
+    ...             breakall
+
     Parameters
     ----------
     func: () -> Any
