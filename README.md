@@ -3,6 +3,7 @@
 ## Break from multiple loops at once in Python
 
 ***Why isn't this a thing in Python?***
+
 [![PyPI version](https://badge.fury.io/py/breakall.svg)](https://pypi.org/project/breakall/)
 [![Downloads](https://static.pepy.tech/personalized-badge/breakall?period=total&units=international_system&left_color=grey&right_color=blue&left_text=Total%20Downloads)](https://pepy.tech/project/breakall)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/breakall)](https://pypistats.org/packages/breakall)

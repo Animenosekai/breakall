@@ -48,7 +48,6 @@ class BreakAllTransformer(ast.NodeTransformer):
     Raises
     ------
     SyntaxError
-    self.build_syntax_error
     """
 
     def __init__(self, filename: str = "<string>", start_line: int = 0) -> None:
@@ -58,12 +57,20 @@ class BreakAllTransformer(ast.NodeTransformer):
         Parameters
         ----------
         filename: str, default = <string>
+            The filename of the source code
         start_line: int, default = 0
+            The starting line of the function in the source code
         """
         self.filename = str(filename)
+        "Filename of the source code (mainly for error messages)"
         self.start_line = int(start_line)
-        self.loop_counter = 0
-        self.functions: typing.List[str] = []
+        "The starting line of the function in the source code"
+        self._loop_counter = 0
+        "(internal) The loop counter to keep track of the loops"
+        self._usage: typing.Set[int] = set()
+        "(internal) What loops have been breaked to in the scope"
+        self._functions: typing.List[str] = []
+        "(internal) The functions in the scope (mainly for error messages)"
 
     def visit_Def(self, node: DefinedFunctionType) -> ast.AST:
         """
@@ -84,17 +91,21 @@ class BreakAllTransformer(ast.NodeTransformer):
                 break
             decorators.append(decorator)
         node.decorator_list = decorators
-        self.functions.append(node.name)
+        self._functions.append(node.name)
         node = self.generic_visit(node)
-        self.functions.pop()
+        self._functions.pop()
         return node
 
     visit_FunctionDef = visit_Def
     visit_AsyncFunctionDef = visit_Def
+    visit_Loop_ReturnType = typing.Union[
+        typing.List[typing.Union[ast.Assign, ast.Try]],
+        LoopType,
+        ast.stmt,
+        typing.List[ast.stmt],
+    ]
 
-    def visit_Loop(
-        self, node: LoopType
-    ) -> typing.List[typing.Union[ast.Assign, ast.Try]]:
+    def visit_Loop(self, node: LoopType) -> visit_Loop_ReturnType:
         """
         Parameters
         ----------
@@ -102,36 +113,47 @@ class BreakAllTransformer(ast.NodeTransformer):
 
         Returns
         -------
+        visit_Loop_ReturnType
         list
         """
-        self.loop_counter += 1  # type: ignore
-        assignment = ast.Assign(
-            targets=[ast.Name(f"@BreakAll{self.loop_counter}", ast.Store())],
-            value=ast.Call(
-                func=ast.Name("type", ast.Load()),
-                args=[
-                    ast.Constant("breakall"),
-                    ast.Tuple(elts=[ast.Name("Exception", ast.Load())], ctx=ast.Load()),
-                    ast.Dict(keys=[], values=[]),
+        self._loop_counter += 1  # type: ignore
+        loop_body: typing.Union[ast.stmt, typing.List[ast.stmt]] = self.generic_visit(
+            node
+        )
+        result: BreakAllTransformer.visit_Loop_ReturnType
+        if self._loop_counter in self._usage:
+            assignment = ast.Assign(
+                targets=[ast.Name(f"@BreakAll{self._loop_counter}", ast.Store())],
+                value=ast.Call(
+                    func=ast.Name("type", ast.Load()),
+                    args=[
+                        ast.Constant("breakall"),
+                        ast.Tuple(
+                            elts=[ast.Name("Exception", ast.Load())], ctx=ast.Load()
+                        ),
+                        ast.Dict(keys=[], values=[]),
+                    ],
+                    keywords=[],
+                ),
+            )
+            try_block = ast.Try(
+                body=loop_body if isinstance(loop_body, list) else [loop_body],
+                handlers=[
+                    ast.ExceptHandler(
+                        type=ast.Name(f"@BreakAll{self._loop_counter}", ast.Load()),
+                        name=None,
+                        body=[ast.Pass()],
+                    )
                 ],
-                keywords=[],
-            ),
-        )
-        loop_body: ast.stmt = self.generic_visit(node)
-        try_block = ast.Try(
-            body=[loop_body],
-            handlers=[
-                ast.ExceptHandler(
-                    type=ast.Name(f"@BreakAll{self.loop_counter}", ast.Load()),
-                    name=None,
-                    body=[ast.Pass()],
-                )
-            ],
-            orelse=[],
-            finalbody=[],
-        )
-        self.loop_counter -= 1
-        return [assignment, try_block]
+                orelse=[],
+                finalbody=[],
+            )
+            result = [assignment, try_block]
+            self._usage.remove(self._loop_counter)
+        else:
+            result = loop_body
+        self._loop_counter -= 1
+        return result
 
     visit_For = visit_Loop
     visit_While = visit_Loop
@@ -168,7 +190,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         str
             The error message
         """
-        function_name = ".".join(self.functions)
+        function_name = ".".join(self._functions)
         msgs = [
             title,
             f'File "{self.filename}", line {node.lineno + self.start_line - 1}, in {function_name}',
@@ -238,17 +260,18 @@ class BreakAllTransformer(ast.NodeTransformer):
                         len(repr(node.annotation.value)),
                     )
                 )
-            destination = self.loop_counter - parsed_break_count + 1
+            destination = self._loop_counter - parsed_break_count + 1
             if destination < 1:
                 raise SyntaxError(
                     self.build_syntax_error(
                         "Invalid break count",
-                        f"There {('are' if self.loop_counter > 1 else 'is')} only {self.loop_counter} loop{('s' if self.loop_counter > 1 else '')} to break.",
+                        f"There {('are' if self._loop_counter > 1 else 'is')} only {self._loop_counter} loop{('s' if self._loop_counter > 1 else '')} to break.",
                         node,
                         len(node.target.id) + 2,
                         len(repr(node.annotation.value)),
                     )
                 )
+            self._usage.add(destination)
             return ast.Raise(
                 exc=ast.Call(
                     func=ast.Name(f"@BreakAll{destination}", ast.Load()),
@@ -277,6 +300,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         if (
             isinstance(node.value, ast.Name) and node.value.id == "breakall"
         ):  # `@BreakAll1` is always the first loop
+            self._usage.add(1)
             return ast.Raise(
                 exc=ast.Call(
                     func=ast.Name(f"@BreakAll1", ast.Load()), args=[], keywords=[]
@@ -357,7 +381,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                         len(repr(value.right.value)),
                     )
                 )
-            if parsed_loop_number == self.loop_counter:
+            if parsed_loop_number == self._loop_counter:
                 # for i in range(n): # Loop 1
                 #     for j in range(m): # Loop 2
                 #         breakall @ 2
@@ -373,16 +397,17 @@ class BreakAllTransformer(ast.NodeTransformer):
                         len(repr(value.right.value)),
                     )
                 )
-            if parsed_loop_number > self.loop_counter:
+            if parsed_loop_number > self._loop_counter:
                 raise SyntaxError(
                     self.build_syntax_error(
                         "Invalid loop number",
-                        f"There {('are' if self.loop_counter > 1 else 'is')} only {self.loop_counter} loop{('s' if self.loop_counter > 1 else '')} to break up until this point. Note that it is impossible to break to a loop defined later.",
+                        f"There {('are' if self._loop_counter > 1 else 'is')} only {self._loop_counter} loop{('s' if self._loop_counter > 1 else '')} to break up until this point. Note that it is impossible to break to a loop defined later.",
                         node,
                         len(value.left.id) + 3,
                         len(repr(value.right.value)),
                     )
                 )
+            self._usage.add(parsed_loop_number)
             return ast.Raise(
                 exc=ast.Call(
                     func=ast.Name(f"@BreakAll{parsed_loop_number}", ast.Load()),
@@ -445,10 +470,11 @@ def fix_source(
     tree = ast.parse(source)
     tree = BreakAllTransformer(filename=filename, start_line=start_line).visit(tree)
     tree = ast.fix_missing_locations(tree)
+    print(ast.unparse(tree))
     return tree
 
 
-def enable_breakall(func: typing.Callable):
+def enable_breakall(func: typing.Optional[typing.Callable] = None):
     """
     Enables the `breakall` statement on the given function
 
@@ -462,7 +488,7 @@ def enable_breakall(func: typing.Callable):
 
     Parameters
     ----------
-    func: () -> Any
+    func: () -> Any | NoneType, default = None
         The function to enable the `breakall` statement on
 
     Raises
@@ -470,6 +496,18 @@ def enable_breakall(func: typing.Callable):
     ValueError
         If the function source code could not be retrieved
     """
+    if func is None:
+        # Enable the `breakall` function for all functions in the current global scope
+        frame = inspect.currentframe()
+        if frame is None:
+            raise ValueError("The current frame could not be retrieved")
+        try:
+            for name, obj in globals().items():
+                if callable(obj):
+                    globals()[name] = enable_breakall(obj)
+        finally:
+            del frame
+        return
     # Gets the source code of the function
     source_lines, start_line = inspect.getsourcelines(func)
     if not source_lines:
