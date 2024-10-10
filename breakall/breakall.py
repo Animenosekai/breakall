@@ -1,6 +1,7 @@
 """The core implementation of the `breakall` statement in Python"""
 
 import ast
+import collections
 import inspect
 import typing
 
@@ -70,7 +71,9 @@ class BreakAllTransformer(ast.NodeTransformer):
         self._usage: typing.Set[int] = set()
         "(internal) What loops have been breaked to in the scope"
         self._functions: typing.List[str] = []
-        "(internal) The functions in the scope (mainly for error messages)"
+        "(internal) The functions in the scope in definition order (mainly for error messages)"
+        self._lambdas_names: typing.Dict[ast.Lambda, str] = {}
+        "(internal) The last lambda assignments in the scope (mainly for error messages)"
 
     def visit_Def(self, node: DefinedFunctionType) -> ast.AST:
         """
@@ -104,6 +107,25 @@ class BreakAllTransformer(ast.NodeTransformer):
         ast.stmt,
         typing.List[ast.stmt],
     ]
+
+    def visit_Lambda(self, node: ast.Lambda) -> ast.AST:
+        """
+        Parameters
+        ----------
+        node: Lambda
+
+        Returns
+        -------
+        AST
+        """
+        try:
+            self._functions.append(f"<lambda@{self._lambdas_names[node]}>")
+        except IndexError:
+            # This is might be an unassigned lambda function
+            self._functions.append("<lambda>")
+        node = self.generic_visit(node)
+        self._functions.pop()
+        return node
 
     def visit_Loop(self, node: LoopType) -> visit_Loop_ReturnType:
         """
@@ -200,6 +222,33 @@ class BreakAllTransformer(ast.NodeTransformer):
         ]
         return "\n".join(msgs)
 
+    def visit_Assign(self, node: ast.Assign) -> ast.AST:
+        """
+        Parameters
+        ----------
+        node: Assign
+
+        Returns
+        -------
+        AST
+        """
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and isinstance(node.value, ast.Lambda):
+            self._lambdas_names[node.value] = node.targets[0].id
+        elif isinstance(node.value, ast.Tuple):
+            for index, target in enumerate(node.targets):
+                if not isinstance(target, ast.Name) or "*" in target.id:
+                    # Don't really know what to do with this one so abort
+                    # For now, we don't support unpacking for lambda names
+                    break
+                try:
+                    lambda_func = node.value.elts[index]
+                    if isinstance(lambda_func, ast.Lambda):
+                        self._lambdas_names[lambda_func] = target.id
+                except IndexError:
+                    # `index` might be out of bound, which shouldn't happen?
+                    break
+        return self.generic_visit(node)
+
     def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.AST:
         """
         Support for the `breakall` statement with a break count.
@@ -280,6 +329,8 @@ class BreakAllTransformer(ast.NodeTransformer):
                 ),
                 cause=None,
             )
+        elif isinstance(node.value, ast.Lambda) and isinstance(node.target, ast.Name):
+            self._lambdas_names[node.value] = node.target.id
         return self.generic_visit(node)
 
     def visit_Expr(self, node: ast.Expr) -> ast.AST:
