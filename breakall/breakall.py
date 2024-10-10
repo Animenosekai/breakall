@@ -1,8 +1,8 @@
 """The core implementation of the `breakall` statement in Python"""
 
 import ast
-import collections
 import inspect
+import sys
 import typing
 
 # This is here only to make type checkers happy
@@ -12,6 +12,24 @@ DefinedFunctionType = typing.TypeVar(
     "DefinedFunctionType", ast.FunctionDef, ast.AsyncFunctionDef
 )
 LoopType = typing.Union[ast.For, ast.While, ast.AsyncFor]
+
+
+class BreakAllSyntaxError(SyntaxError):
+    pass
+
+
+def exception_hook(exctype, value, traceback):
+    """
+    Parameters
+    ----------
+    exctype
+    value
+    traceback
+    """
+    if exctype is BreakAllSyntaxError:
+        print(f"{exctype.__name__}: {value}")
+        return
+    sys.__excepthook__(exctype, value, traceback)
 
 
 class BreakAllTransformer(ast.NodeTransformer):
@@ -48,6 +66,7 @@ class BreakAllTransformer(ast.NodeTransformer):
 
     Raises
     ------
+    BreakAllSyntaxError
     SyntaxError
     """
 
@@ -232,7 +251,11 @@ class BreakAllTransformer(ast.NodeTransformer):
         -------
         AST
         """
-        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and isinstance(node.value, ast.Lambda):
+        if (
+            len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and isinstance(node.value, ast.Lambda)
+        ):
             self._lambdas_names[node.value] = node.targets[0].id
         elif isinstance(node.value, ast.Tuple):
             for index, target in enumerate(node.targets):
@@ -270,12 +293,13 @@ class BreakAllTransformer(ast.NodeTransformer):
 
         Raises
         ------
+        BreakAllSyntaxError
         SyntaxError
         """
         # If the `breakall` statement also has a break count
         if isinstance(node.target, ast.Name) and node.target.id == "breakall":
             if not isinstance(node.annotation, ast.Constant):
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid break count",
                         "The break count must be a literal",
@@ -287,7 +311,7 @@ class BreakAllTransformer(ast.NodeTransformer):
             try:
                 parsed_break_count = int(node.annotation.value)
             except Exception:
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid break count",
                         f"Cannot parse the break count `{node.annotation.value}`",
@@ -300,7 +324,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 # Little optimization
                 return ast.Break()
             if parsed_break_count < 1:
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid break count",
                         "The break count must be greater than 0",
@@ -311,7 +335,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 )
             destination = self._loop_counter - parsed_break_count + 1
             if destination < 1:
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid break count",
                         f"There {('are' if self._loop_counter > 1 else 'is')} only {self._loop_counter} loop{('s' if self._loop_counter > 1 else '')} to break.",
@@ -345,6 +369,7 @@ class BreakAllTransformer(ast.NodeTransformer):
 
         Raises
         ------
+        BreakAllSyntaxError
         SyntaxError
         """
         # If the expression is a `breakall` statement
@@ -369,7 +394,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 operator_repr = OPERATOR_REPR.get(
                     type(node.value.op), ast.unparse(node.value.op)
                 )
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid break operation",
                         "The `breakall` statement must be alone, followed by `:` and a break count or `@` and a loop number",
@@ -400,7 +425,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 operator_repr = OPERATOR_REPR.get(type(value.op), ast.unparse(value.op))
                 operator_length = len(operator_repr)
                 # + 1 for the space before the operator
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid break operation",
                         f"The `breakall` statement must be alone, followed by `:` and a break count or `@` and a loop number, not `{operator_repr}`",
@@ -411,7 +436,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 )
             # + 3 for the space before the operator, the `@` operator and the space after the operator
             if not isinstance(value.right, ast.Constant):
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid loop number",
                         "The loop number must be a literal",
@@ -423,7 +448,7 @@ class BreakAllTransformer(ast.NodeTransformer):
             try:
                 parsed_loop_number = int(value.right.value)
             except Exception:
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid loop number",
                         f"Cannot parse the loop number `{value.right.value}`",
@@ -439,7 +464,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 # `breakall @ 2` breaks the second loop which is equivalent to `break`
                 return ast.Break()
             if parsed_loop_number < 1:
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid loop number",
                         "The loop number must be greater than 0",
@@ -449,7 +474,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                     )
                 )
             if parsed_loop_number > self._loop_counter:
-                raise SyntaxError(
+                raise BreakAllSyntaxError(
                     self.build_syntax_error(
                         "Invalid loop number",
                         f"There {('are' if self._loop_counter > 1 else 'is')} only {self._loop_counter} loop{('s' if self._loop_counter > 1 else '')} to break up until this point. Note that it is impossible to break to a loop defined later.",
@@ -519,7 +544,11 @@ def fix_source(
         The fixed source code
     """
     tree = ast.parse(source)
+    # Avoid having big stack traces for a SyntaxError on the user's side
+    sys.excepthook = exception_hook
     tree = BreakAllTransformer(filename=filename, start_line=start_line).visit(tree)
+    # Restore the previous behavior for performance reasons
+    sys.excepthook = sys.__excepthook__
     tree = ast.fix_missing_locations(tree)
     return tree
 
