@@ -521,7 +521,6 @@ def fix_source(
     tree = ast.parse(source)
     tree = BreakAllTransformer(filename=filename, start_line=start_line).visit(tree)
     tree = ast.fix_missing_locations(tree)
-    print(ast.unparse(tree))
     return tree
 
 
