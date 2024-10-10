@@ -12,10 +12,11 @@ def main():
     for i in range(10):
         for j in range(10):
             for k in range(10):
+                raise ValueError("Hello")
                 print(i, j, k)
                 # raise locals()[f"@BreakAll{callable()}"]()
                 breakall: 3
-            breakall @ 3
+            breakall @ 2
             print("This will not print")
     print("Hey")
 

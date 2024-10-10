@@ -3,13 +3,15 @@
 [ ] Create a CLI to directly run Python code without putting the decorator  
 [ ] Hide the traceback for SyntaxError  
 [ ] Test on `async def`, `async for`  
-[ ] Fix the line number in the traceback/code when a modified function is ran  
 [ ] Make a custom inheritant of `SyntaxError`  
 [ ] Look at the support for having the `enable_breakall` decorator named differently  
 [x] Add support for `lambda` functions  
 [x] Remove code modification when it is not useful  
+[ ] WONTFIX: Fix the line number in the traceback/code when a modified function is ran  [^1]
 
 ## Optimisation
 
 1-pass: Tsuika shite, tsuika shita loop wo list ni irete, 1-pass ga owattara, dono loop ga tsukawareta ga wakaru
 2-pass: tsukatte nai try...except wo torikesu
+
+[^1]: The problem here is that the code is modified, and the line number in the traceback is not the same as the line number in the actual source code. Python will then consider the added lines as part of the source code, and will report it even if the user didn't actually write it. There is no fix to this problem, as it is inherent to the way the code is modified.
