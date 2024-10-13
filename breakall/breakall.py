@@ -5,31 +5,20 @@ import inspect
 import sys
 import typing
 
+from breakall.exceptions import (BreakAllEnvironmentError, BreakAllSyntaxError,
+                                 exception_hook)
+from breakall.nodes import same_location
+
 # This is here only to make type checkers happy
 breakall = "breakall"
+"The `breakall` statement. You can import this to make the type checkers happy."
 # Type definitions
 DefinedFunctionType = typing.TypeVar(
     "DefinedFunctionType", ast.FunctionDef, ast.AsyncFunctionDef
 )
+"The type of the defined function in the AST"
 LoopType = typing.Union[ast.For, ast.While, ast.AsyncFor]
-
-
-class BreakAllSyntaxError(SyntaxError):
-    pass
-
-
-def exception_hook(exctype, value, traceback):
-    """
-    Parameters
-    ----------
-    exctype
-    value
-    traceback
-    """
-    if exctype is BreakAllSyntaxError:
-        print(f"{exctype.__name__}: {value}")
-        return
-    sys.__excepthook__(exctype, value, traceback)
+"The type of the loop in the AST"
 
 
 class BreakAllTransformer(ast.NodeTransformer):
@@ -52,22 +41,18 @@ class BreakAllTransformer(ast.NodeTransformer):
     >>> tree = ast.parse(source)
     >>> BreakAllTransformer().visit(tree)
     # Produces an AST tree which is equivalent to:
-    @BreakAll1 = type("breakall", (Exception,), {})
+    1@breakall = type("breakall", (Exception,), {})
     try:
         for i in range(10):
-            @BreakAll2 = type("breakall", (Exception,), {})
-            try:
-                for j in range(10):
-                    raise @BreakAll1
-            except @BreakAll2:
-                pass
-    except @BreakAll1:
+            for j in range(10):
+                raise 1@breakall
+    except 1@breakall:
         pass
 
     Raises
     ------
+    BreakAllSyntaxError.from_node
     BreakAllSyntaxError
-    SyntaxError
     """
 
     def __init__(self, filename: str = "<string>", start_line: int = 0) -> None:
@@ -127,6 +112,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         typing.List[ast.stmt],
     ]
 
+    @same_location
     def visit_Lambda(self, node: ast.Lambda) -> ast.AST:
         """
         Parameters
@@ -157,14 +143,14 @@ class BreakAllTransformer(ast.NodeTransformer):
         visit_Loop_ReturnType
         list
         """
-        self._loop_counter += 1  # type: ignore
+        self._loop_counter += 1
         loop_body: typing.Union[ast.stmt, typing.List[ast.stmt]] = self.generic_visit(
             node
         )
         result: BreakAllTransformer.visit_Loop_ReturnType
         if self._loop_counter in self._usage:
             assignment = ast.Assign(
-                targets=[ast.Name(f"@BreakAll{self._loop_counter}", ast.Store())],
+                targets=[ast.Name(f"{self._loop_counter}@breakall", ast.Store())],
                 value=ast.Call(
                     func=ast.Name("type", ast.Load()),
                     args=[
@@ -181,7 +167,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 body=loop_body if isinstance(loop_body, list) else [loop_body],
                 handlers=[
                     ast.ExceptHandler(
-                        type=ast.Name(f"@BreakAll{self._loop_counter}", ast.Load()),
+                        type=ast.Name(f"{self._loop_counter}@breakall", ast.Load()),
                         name=None,
                         body=[ast.Pass()],
                     )
@@ -192,6 +178,7 @@ class BreakAllTransformer(ast.NodeTransformer):
             result = [assignment, try_block]
             self._usage.remove(self._loop_counter)
         else:
+            # Don't apply modifications if not needed
             result = loop_body
         self._loop_counter -= 1
         return result
@@ -200,47 +187,7 @@ class BreakAllTransformer(ast.NodeTransformer):
     visit_While = visit_Loop
     visit_AsyncFor = visit_Loop
 
-    def build_syntax_error(
-        self,
-        title: str,
-        message: str,
-        node: typing.Union[ast.stmt, ast.expr],
-        spacing: int,
-        error_length: int,
-        indicator: str = "~",
-    ) -> str:
-        """
-        Builds the error message for syntax errors
-
-        Parameters
-        ----------
-        title: str
-            The title of the error
-        message: str
-            The message of the error
-        node: expr | stmt
-            The node which caused the error
-        spacing: int
-            The spacing before the error happened in the line
-        error_length: int
-            The length of the error
-        indicator: str, default = ~
-
-        Returns
-        -------
-        str
-            The error message
-        """
-        function_name = ".".join(self._functions)
-        msgs = [
-            title,
-            f'File "{self.filename}", line {node.lineno + self.start_line - 1}, in {function_name}',
-            f"{' ' * node.col_offset}{ast.unparse(node)}",
-            f"{' ' * node.col_offset}{' ' * spacing}{indicator * error_length}",
-            message,
-        ]
-        return "\n".join(msgs)
-
+    @same_location
     def visit_Assign(self, node: ast.Assign) -> ast.AST:
         """
         Parameters
@@ -272,7 +219,10 @@ class BreakAllTransformer(ast.NodeTransformer):
                     break
         return self.generic_visit(node)
 
-    def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.AST:
+    @same_location
+    def visit_AnnAssign(
+        self, node: ast.AnnAssign
+    ) -> typing.Union[ast.AST | typing.List[ast.AST]]:
         """
         Support for the `breakall` statement with a break count.
 
@@ -293,61 +243,147 @@ class BreakAllTransformer(ast.NodeTransformer):
 
         Raises
         ------
+        BreakAllSyntaxError.from_node
         BreakAllSyntaxError
-        SyntaxError
         """
         # If the `breakall` statement also has a break count
         if isinstance(node.target, ast.Name) and node.target.id == "breakall":
             if not isinstance(node.annotation, ast.Constant):
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid break count",
-                        "The break count must be a literal",
-                        node,
-                        len(node.target.id) + 2,
-                        len(ast.unparse(node.annotation)),
-                    )
-                )
+                # Any loop up until this point can be broken
+                self._usage.update(range(1, self._loop_counter + 1))
+                return [
+                    ast.ImportFrom(
+                        module="breakall.runtime",
+                        names=[ast.alias(name="destination_from_break_count")],
+                        level=0,
+                    ),
+                    ast.Raise(
+                        exc=ast.Subscript(
+                            value=ast.Call(
+                                func=ast.Name(id="locals", ctx=ast.Load()),
+                                args=[],
+                                keywords=[],
+                            ),
+                            slice=ast.Call(
+                                func=ast.Attribute(
+                                    value=ast.Constant(value="{dest}@breakall"),
+                                    attr="format",
+                                    ctx=ast.Load(),
+                                ),
+                                args=[],
+                                keywords=[
+                                    ast.keyword(
+                                        arg="dest",
+                                        value=ast.Call(
+                                            func=ast.Name(
+                                                id="destination_from_break_count",
+                                                ctx=ast.Load(),
+                                            ),
+                                            args=[],
+                                            keywords=[
+                                                ast.keyword(
+                                                    arg="count", value=node.annotation
+                                                ),
+                                                ast.keyword(
+                                                    arg="current_loop",
+                                                    value=ast.Constant(
+                                                        value=self._loop_counter
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="filename",
+                                                    value=ast.Constant(
+                                                        value=self.filename
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="line",
+                                                    value=ast.Constant(
+                                                        value=node.lineno
+                                                        + self.start_line
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="function",
+                                                    value=ast.Constant(
+                                                        value=".".join(self._functions)
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="col_offset",
+                                                    value=ast.Constant(
+                                                        value=node.col_offset
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="spacing",
+                                                    value=ast.Constant(
+                                                        value=len(node.target.id) + 2
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="unparsed_node",
+                                                    value=ast.Constant(
+                                                        value=ast.unparse(node)
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="error_length",
+                                                    value=ast.Constant(
+                                                        value=len(
+                                                            ast.unparse(node.annotation)
+                                                        )
+                                                    ),
+                                                ),
+                                            ],
+                                        ),
+                                    )
+                                ],
+                            ),
+                            ctx=ast.Load(),
+                        )
+                    ),
+                ]
             try:
                 parsed_break_count = int(node.annotation.value)
             except Exception:
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid break count",
-                        f"Cannot parse the break count `{node.annotation.value}`",
-                        node,
-                        len(node.target.id) + 2,
-                        len(repr(node.annotation.value)),
-                    )
+                raise BreakAllSyntaxError.from_node(
+                    title="Invalid break count",
+                    message=f"Cannot parse the break count `{node.annotation.value}`",
+                    node=node,
+                    spacing=len(node.target.id) + 2,
+                    error_length=len(repr(node.annotation.value)),
+                    filename=self.filename,
+                    function=".".join(self._functions),
                 )
             if parsed_break_count == 1:
                 # Little optimization
                 return ast.Break()
             if parsed_break_count < 1:
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid break count",
-                        "The break count must be greater than 0",
-                        node,
-                        len(node.target.id) + 2,
-                        len(repr(node.annotation.value)),
-                    )
+                raise BreakAllSyntaxError.from_node(
+                    title="Invalid break count",
+                    message="The break count must be greater than 0",
+                    node=node,
+                    spacing=len(node.target.id) + 2,
+                    error_length=len(repr(node.annotation.value)),
+                    filename=self.filename,
+                    function=".".join(self._functions),
                 )
             destination = self._loop_counter - parsed_break_count + 1
             if destination < 1:
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid break count",
-                        f"There {('are' if self._loop_counter > 1 else 'is')} only {self._loop_counter} loop{('s' if self._loop_counter > 1 else '')} to break.",
-                        node,
-                        len(node.target.id) + 2,
-                        len(repr(node.annotation.value)),
-                    )
+                raise BreakAllSyntaxError.from_node(
+                    title="Invalid break count",
+                    message=f"There {('are' if self._loop_counter > 1 else 'is')} only {self._loop_counter} loop{('s' if self._loop_counter > 1 else '')} to break.",
+                    node=node,
+                    spacing=len(node.target.id) + 2,
+                    error_length=len(repr(node.annotation.value)),
+                    filename=self.filename,
+                    function=".".join(self._functions),
                 )
             self._usage.add(destination)
             return ast.Raise(
                 exc=ast.Call(
-                    func=ast.Name(f"@BreakAll{destination}", ast.Load()),
+                    func=ast.Name(f"{destination}@breakall", ast.Load()),
                     args=[],
                     keywords=[],
                 ),
@@ -357,7 +393,10 @@ class BreakAllTransformer(ast.NodeTransformer):
             self._lambdas_names[node.value] = node.target.id
         return self.generic_visit(node)
 
-    def visit_Expr(self, node: ast.Expr) -> ast.AST:
+    @same_location
+    def visit_Expr(
+        self, node: ast.Expr
+    ) -> typing.Union[ast.AST | typing.List[ast.AST]]:
         """
         Parameters
         ----------
@@ -369,17 +408,17 @@ class BreakAllTransformer(ast.NodeTransformer):
 
         Raises
         ------
+        BreakAllSyntaxError.from_node
         BreakAllSyntaxError
-        SyntaxError
         """
         # If the expression is a `breakall` statement
         if (
             isinstance(node.value, ast.Name) and node.value.id == "breakall"
-        ):  # `@BreakAll1` is always the first loop
+        ):  # `1@breakall` is always the first loop
             self._usage.add(1)
             return ast.Raise(
                 exc=ast.Call(
-                    func=ast.Name(f"@BreakAll1", ast.Load()), args=[], keywords=[]
+                    func=ast.Name(f"1@breakall", ast.Load()), args=[], keywords=[]
                 ),
                 cause=None,
             )
@@ -394,14 +433,14 @@ class BreakAllTransformer(ast.NodeTransformer):
                 operator_repr = OPERATOR_REPR.get(
                     type(node.value.op), ast.unparse(node.value.op)
                 )
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid break operation",
-                        "The `breakall` statement must be alone, followed by `:` and a break count or `@` and a loop number",
-                        node,
-                        0,
-                        len(operator_repr),
-                    )
+                raise BreakAllSyntaxError.from_node(
+                    title="Invalid break operation",
+                    message=f"The `breakall` statement must be alone, followed by `:` and a break count or `@` and a loop number, not preceeded by `{operator_repr}`",
+                    node=node,
+                    spacing=0,
+                    error_length=len(operator_repr),
+                    filename=self.filename,
+                    function=".".join(self._functions),
                 )
         if not isinstance(node.value, ast.BinOp):
             return self.generic_visit(node)
@@ -425,37 +464,123 @@ class BreakAllTransformer(ast.NodeTransformer):
                 operator_repr = OPERATOR_REPR.get(type(value.op), ast.unparse(value.op))
                 operator_length = len(operator_repr)
                 # + 1 for the space before the operator
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid break operation",
-                        f"The `breakall` statement must be alone, followed by `:` and a break count or `@` and a loop number, not `{operator_repr}`",
-                        node,
-                        len(value.left.id) + 1,
-                        operator_length,
-                    )
+                raise BreakAllSyntaxError.from_node(
+                    title="Invalid break operation",
+                    message=f"The `breakall` statement must be alone, followed by `:` and a break count or `@` and a loop number, not `{operator_repr}`",
+                    node=node,
+                    spacing=len(value.left.id) + 1,
+                    error_length=operator_length,
+                    filename=self.filename,
+                    function=".".join(self._functions),
                 )
             # + 3 for the space before the operator, the `@` operator and the space after the operator
             if not isinstance(value.right, ast.Constant):
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid loop number",
-                        "The loop number must be a literal",
-                        node,
-                        len(value.left.id) + 3,
-                        len(ast.unparse(value.right)),
-                    )
-                )
+                # Any loop up until this point can be broken
+                self._usage.update(range(1, self._loop_counter + 1))
+                return [
+                    ast.ImportFrom(
+                        module="breakall.runtime",
+                        names=[ast.alias(name="destination_from_loop_number")],
+                        level=0,
+                    ),
+                    ast.Raise(
+                        exc=ast.Subscript(
+                            value=ast.Call(
+                                func=ast.Name(id="locals", ctx=ast.Load()),
+                                args=[],
+                                keywords=[],
+                            ),
+                            slice=ast.Call(
+                                func=ast.Attribute(
+                                    value=ast.Constant(value="{dest}@breakall"),
+                                    attr="format",
+                                    ctx=ast.Load(),
+                                ),
+                                args=[],
+                                keywords=[
+                                    ast.keyword(
+                                        arg="dest",
+                                        value=ast.Call(
+                                            func=ast.Name(
+                                                id="destination_from_loop_number",
+                                                ctx=ast.Load(),
+                                            ),
+                                            args=[],
+                                            keywords=[
+                                                ast.keyword(
+                                                    arg="loop", value=value.right
+                                                ),
+                                                ast.keyword(
+                                                    arg="current_loop",
+                                                    value=ast.Constant(
+                                                        value=self._loop_counter
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="filename",
+                                                    value=ast.Constant(
+                                                        value=self.filename
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="line",
+                                                    value=ast.Constant(
+                                                        value=node.lineno
+                                                        + self.start_line
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="function",
+                                                    value=ast.Constant(
+                                                        value=".".join(self._functions)
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="col_offset",
+                                                    value=ast.Constant(
+                                                        value=node.col_offset
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="spacing",
+                                                    value=ast.Constant(
+                                                        value=len(value.left.id) + 3
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="unparsed_node",
+                                                    value=ast.Constant(
+                                                        value=ast.unparse(value)
+                                                    ),
+                                                ),
+                                                ast.keyword(
+                                                    arg="error_length",
+                                                    value=ast.Constant(
+                                                        value=len(
+                                                            ast.unparse(value.right)
+                                                        )
+                                                    ),
+                                                ),
+                                            ],
+                                        ),
+                                    )
+                                ],
+                            ),
+                            ctx=ast.Load(),
+                        )
+                    ),
+                ]
             try:
                 parsed_loop_number = int(value.right.value)
             except Exception:
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid loop number",
-                        f"Cannot parse the loop number `{value.right.value}`",
-                        node,
-                        len(value.left.id) + 3,
-                        len(repr(value.right.value)),
-                    )
+                raise BreakAllSyntaxError.from_node(
+                    title="Invalid loop number",
+                    message=f"Cannot parse the loop number `{value.right.value}`",
+                    node=node,
+                    spacing=len(value.left.id) + 3,
+                    error_length=len(repr(value.right.value)),
+                    filename=self.filename,
+                    function=".".join(self._functions),
                 )
             if parsed_loop_number == self._loop_counter:
                 # for i in range(n): # Loop 1
@@ -464,33 +589,28 @@ class BreakAllTransformer(ast.NodeTransformer):
                 # `breakall @ 2` breaks the second loop which is equivalent to `break`
                 return ast.Break()
             if parsed_loop_number < 1:
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid loop number",
-                        "The loop number must be greater than 0",
-                        node,
-                        len(value.left.id) + 3,
-                        len(repr(value.right.value)),
-                    )
+                raise BreakAllSyntaxError.from_node(
+                    title="Invalid loop number",
+                    message="The loop number must be greater than 0",
+                    node=node,
+                    spacing=len(value.left.id) + 3,
+                    error_length=len(repr(value.right.value)),
+                    filename=self.filename,
+                    function=".".join(self._functions),
                 )
             if parsed_loop_number > self._loop_counter:
-                raise BreakAllSyntaxError(
-                    self.build_syntax_error(
-                        "Invalid loop number",
-                        f"There {('are' if self._loop_counter > 1 else 'is')} only {self._loop_counter} loop{('s' if self._loop_counter > 1 else '')} to break up until this point. Note that it is impossible to break to a loop defined later.",
-                        node,
-                        len(value.left.id) + 3,
-                        len(repr(value.right.value)),
-                    )
+                raise BreakAllSyntaxError.from_node(
+                    title="Invalid loop number",
+                    message=f"There {('are' if self._loop_counter > 1 else 'is')} only {self._loop_counter} loop{('s' if self._loop_counter > 1 else '')} to break up until this point. Note that it is impossible to break to a loop defined later.",
+                    node=node,
+                    spacing=len(value.left.id) + 3,
+                    error_length=len(repr(value.right.value)),
+                    filename=self.filename,
+                    function=".".join(self._functions),
                 )
             self._usage.add(parsed_loop_number)
             return ast.Raise(
-                exc=ast.Call(
-                    func=ast.Name(f"@BreakAll{parsed_loop_number}", ast.Load()),
-                    args=[],
-                    keywords=[],
-                ),
-                cause=None,
+                exc=ast.Name(f"{parsed_loop_number}@breakall", ast.Load()), cause=None
             )
         return self.generic_visit(node)
 
@@ -517,16 +637,16 @@ def fix_source(
     ... '''
     >>> fix_source(source)
     # Produces an AST tree which is equivalent to:
-    @BreakAll1 = type("breakall", (Exception,), {})
+    1@breakall = type("breakall", (Exception,), {})
     try:
         for i in range(10):
-            @BreakAll2 = type("breakall", (Exception,), {})
+            2@breakall = type("breakall", (Exception,), {})
             try:
                 for j in range(10):
-                    raise @BreakAll1
-            except @BreakAll2:
+                    raise 1@breakall
+            except 2@breakall:
                 pass
-    except @BreakAll1:
+    except 1@breakall:
         pass
 
     Parameters
@@ -572,25 +692,39 @@ def enable_breakall(func: typing.Optional[typing.Callable] = None):
 
     Raises
     ------
-    ValueError
+    BreakAllEnvironmentError
         If the function source code could not be retrieved
     """
     if func is None:
         # Enable the `breakall` function for all functions in the current global scope
         frame = inspect.currentframe()
         if frame is None:
-            raise ValueError("The current frame could not be retrieved")
+            raise BreakAllEnvironmentError(
+                title="No frame found",
+                message="The current frame could not be retrieved",
+            )
+        prev_frame = frame.f_back
+        if prev_frame is None:
+            raise BreakAllEnvironmentError(
+                title="No previous frame found",
+                message="The previous frame could not be retrieved",
+            )
         try:
-            for name, obj in globals().items():
-                if callable(obj):
-                    globals()[name] = enable_breakall(obj)
+            for name, obj in prev_frame.f_globals.items():
+                if callable(obj) and hasattr(obj, "__globals__"):
+                    prev_frame.f_globals[name] = enable_breakall(obj)
         finally:
             del frame
         return
     # Gets the source code of the function
     source_lines, start_line = inspect.getsourcelines(func)
     if not source_lines:
-        raise ValueError("The function source code could not be retrieved")
+        raise BreakAllEnvironmentError(
+            title="No source code found",
+            message="The function source code could not be retrieved",
+            line=start_line,
+            filename=inspect.getsourcefile(func) or "<string>",
+        )
     indentation = 0
     for element in source_lines[0]:
         if not element.isspace():
@@ -634,5 +768,6 @@ def supports_breakall(func: typing.Callable):
     bool
         Whether the function supports the `breakall` statement
     """
-    return hasattr(func, "supports_breakall") and func.supports_breakall  # type: ignore
+    # Maybe also check the AST
+    return hasattr(func, "supports_breakall") and func.supports_breakall
 

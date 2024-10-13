@@ -27,6 +27,8 @@ Example
 from .__info__ import __author__, __copyright__, __license__, __version__
 from .breakall import (BreakAllTransformer, breakall, enable_breakall,
                        fix_source, supports_breakall)
+from .exceptions import BreakAllError, BreakAllEnvironmentError, BreakAllRuntimeError, BreakAllSyntaxError
+from .runtime import destination_from_break_count, destination_from_loop_number
 
 __all__ = [
     "breakall",
@@ -34,6 +36,12 @@ __all__ = [
     "supports_breakall",
     "BreakAllTransformer",
     "fix_source",
+    "destination_from_break_count",
+    "destination_from_loop_number",
+    "BreakAllError",
+    "BreakAllEnvironmentError",
+    "BreakAllRuntimeError",
+    "BreakAllSyntaxError",
     "__author__",
     "__version__",
     "__license__",

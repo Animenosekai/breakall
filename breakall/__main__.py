@@ -1,8 +1,9 @@
+"""The CLI for the `breakall` module"""
+
 import argparse
 import ast
 import pathlib
 import typing
-import sys
 
 import breakall
 
@@ -14,6 +15,7 @@ def main(file: pathlib.Path, output: typing.Optional[str] = None):
     Parameters
     ----------
     file: Path
+    output: NoneType | str, default = None
     """
     # Reading the source code
     with open(file, "r") as f:
@@ -39,8 +41,9 @@ def main(file: pathlib.Path, output: typing.Optional[str] = None):
         result = ast.unparse(tree)
         if output == "-":
             print(result)
-        with open(output, "w") as f:
-            f.write(result)
+        else:
+            with open(output, "w") as f:
+                f.write(result)
 
 
 def entry():
@@ -55,7 +58,10 @@ def entry():
     #     action="store_true",
     #     default=False,
     # )
-    parser.add_argument("--output", help="If provided, will write the modified source code to the provided file.")
+    parser.add_argument(
+        "--output",
+        help="If provided, will write the modified source code to the provided file.",
+    )
     args = parser.parse_args()
     main(file=pathlib.Path(args.file), output=args.output)
 
