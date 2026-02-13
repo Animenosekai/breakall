@@ -96,7 +96,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         "(internal) The last lambda assignments in the scope"
 
     @same_location
-    def visit_def(self, node: DefinedFunctionType) -> ast.AST:  # type: ignore[override]
+    def visit_def(self, node: DefinedFunctionType) -> ast.AST:  # pyright: ignore[reportIncompatibleMethodOverride]
         """
         Visit a function definition node.
 
@@ -120,18 +120,18 @@ class BreakAllTransformer(ast.NodeTransformer):
             decorators.append(decorator)
         node.decorator_list = decorators
         self._functions.append(node.name)
-        node = self.generic_visit(node)  # type: ignore[assignment]
+        node = self.generic_visit(node)  # pyright: ignore[reportAssignmentType]
         self._functions.pop()
         return node
 
-    visit_FunctionDef = visit_def  # type: ignore[assignment] # noqa: N815
-    visit_AsyncFunctionDef = visit_def  # type: ignore[assignment] # noqa: N815
+    visit_FunctionDef = visit_def  # pyright: ignore[reportAssignmentType] # noqa: N815
+    visit_AsyncFunctionDef = visit_def  # pyright: ignore[reportAssignmentType] # noqa: N815
     visit_Loop_ReturnType: typing.TypeAlias = (  # noqa: PYI042, N815
         list[ast.Assign | ast.Try] | LoopType | ast.stmt | list[ast.stmt]
     )
 
-    @same_location  # type: ignore[no-untyped-def]
-    def visit_lambda(self, node: ast.Lambda) -> ast.AST:  # type: ignore[override]
+    @same_location
+    def visit_lambda(self, node: ast.Lambda) -> ast.AST:  # pyright: ignore[reportIncompatibleMethodOverride]
         """
         Visit a lambda node.
 
@@ -150,12 +150,12 @@ class BreakAllTransformer(ast.NodeTransformer):
         except KeyError:
             # This might be an unassigned lambda function
             self._functions.append("<lambda>")
-        node = self.generic_visit(node)  # type: ignore[assignment]
+        node = self.generic_visit(node)  # pyright: ignore[reportAssignmentType]
         self._functions.pop()
         return node
 
-    @same_location  # type: ignore[no-untyped-def]
-    def visit_loop(  # type: ignore[override]
+    @same_location  # pyright: ignore[reportArgumentType]
+    def visit_loop(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         node: LoopType,
     ) -> visit_Loop_ReturnType:
@@ -173,7 +173,7 @@ class BreakAllTransformer(ast.NodeTransformer):
             The modified node(s)
         """
         self._loop_counter += 1
-        loop_body: ast.stmt | list[ast.stmt] = self.generic_visit(node)  # type: ignore[assignment]
+        loop_body: ast.stmt | list[ast.stmt] = self.generic_visit(node)  # pyright: ignore[reportAssignmentType]
         result: BreakAllTransformer.visit_Loop_ReturnType
         if self._loop_counter in self._usage:
             assignment = ast.Assign(
@@ -211,12 +211,12 @@ class BreakAllTransformer(ast.NodeTransformer):
         self._loop_counter -= 1
         return result
 
-    visit_For = visit_loop  # type: ignore[assignment] # noqa: N815
-    visit_While = visit_loop  # type: ignore[assignment] # noqa: N815
-    visit_AsyncFor = visit_loop  # type: ignore[assignment] # noqa: N815
+    visit_For = visit_loop  # pyright: ignore[reportAssignmentType] # noqa: N815
+    visit_While = visit_loop  # pyright: ignore[reportAssignmentType] # noqa: N815
+    visit_AsyncFor = visit_loop  # pyright: ignore[reportAssignmentType] # noqa: N815
 
     @same_location
-    def visit_assign(self, node: ast.Assign) -> ast.AST:  # type: ignore[override]
+    def visit_assign(self, node: ast.Assign) -> ast.AST:  # pyright: ignore[reportIncompatibleMethodOverride]
         """
         Visit an assignment node.
 
@@ -249,10 +249,10 @@ class BreakAllTransformer(ast.NodeTransformer):
                 except IndexError:
                     # `index` might be out of bound, which shouldn't happen?
                     break
-        return self.generic_visit(node)  # type: ignore[return-value]
+        return self.generic_visit(node)  # pyright: ignore[reportReturnType]
 
     @same_location
-    def visit_annotated_assign(  # type: ignore[override]
+    def visit_annotated_assign(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         node: ast.AnnAssign,
     ) -> ast.AST | list[ast.AST]:
@@ -384,7 +384,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                     ),
                 ]
             try:
-                parsed_break_count = int(node.annotation.value)  # type: ignore[arg-type]
+                parsed_break_count = int(node.annotation.value)  # pyright: ignore[reportArgumentType]
             except Exception as exc:
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid break count",
@@ -438,7 +438,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         return self.generic_visit(node)
 
     @same_location
-    def visit_Expr(  # noqa: N802, type: ignore[override]
+    def visit_Expr(  # noqa: N802, pyright: ignore[reportIncompatibleMethodOverride]
         self,
         node: ast.Expr,
     ) -> ast.AST | list[ast.AST]:
@@ -481,7 +481,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 type[ast.operator | ast.unaryop],
                 str,
             ] = {ast.UAdd: "+", ast.USub: "-", ast.Not: "not", ast.Invert: "~"}
-            operator_repr = operator_repr_map.get(  # type: ignore[arg-type]
+            operator_repr = operator_repr_map.get(  # pyright: ignore[reportArgumentType]
                 type(node.value.op),
                 ast.unparse(node.value.op),
             )
@@ -503,7 +503,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         value = node.value
         if isinstance(value.left, ast.Name) and value.left.id == "breakall":
             if not isinstance(value.op, ast.MatMult):
-                binop_repr_map: dict[type[ast.operator], str] = {  # type: ignore[misc]
+                binop_repr_map: dict[type[ast.operator], str] = {  # pyright: ignore[reportInvalidTypeForm]
                     ast.Add: "+",
                     ast.Sub: "-",
                     ast.Mult: "*",
@@ -517,11 +517,11 @@ class BreakAllTransformer(ast.NodeTransformer):
                     ast.BitAnd: "&",
                     ast.FloorDiv: "//",
                 }
-                operator_repr = binop_repr_map.get(  # type: ignore[arg-type]
+                operator_repr = binop_repr_map.get(  # pyright: ignore[reportArgumentType]
                     type(value.op),
                     ast.unparse(value.op),
                 )
-                operator_length: int = len(operator_repr)  # type: ignore[arg-type]
+                operator_length: int = len(operator_repr)  # pyright: ignore[reportArgumentType]
                 # + 1 for the space before the operator
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid break operation",
@@ -635,7 +635,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                     ),
                 ]
             try:
-                parsed_loop_number = int(value.right.value)  # type: ignore[arg-type]
+                parsed_loop_number = int(value.right.value)  # pyright: ignore[reportArgumentType]
             except Exception as exc:
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid loop number",
@@ -842,16 +842,16 @@ def enable_breakall(  # noqa: PLR0912
     compiled = compile(tree, filename, "exec")
     # Executes the compiled source code (module)
     output: dict[str, typing.Any] = {}
-    exec(compiled, func.__globals__, output)  # noqa: S102
+    exec(compiled, func.__globals__, output)  # noqa: S102, pyright: ignore[reportUnknownArgumentType]
     # Gets the function from the module
     for name, obj in output.items():
         if name == func.__name__:
             func = obj
             # Indicates that the function has been modified
-            func.supports_breakall = True  # type: ignore[attr-defined]
+            func.supports_breakall = True  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
             break
     else:
-        func.supports_breakall = False  # type: ignore[attr-defined]
+        func.supports_breakall = False  # pyright: ignore[reportFunctionMemberAccess]
     # Returns the function
     return func
 
@@ -871,4 +871,4 @@ def supports_breakall(func: Callable[..., typing.Any]) -> bool:
         Whether the function supports the `breakall` statement
     """
     # Maybe also check the AST
-    return hasattr(func, "supports_breakall") and func.supports_breakall  # type: ignore[attr-defined]
+    return hasattr(func, "supports_breakall") and func.supports_breakall  # pyright: ignore[reportFunctionMemberAccess]

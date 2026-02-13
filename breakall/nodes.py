@@ -39,31 +39,31 @@ def copy_location(
         The target node with copied location data
     """
     if source == target:
-        return target  # type: ignore[return-value]
+        return target  # pyright: ignore[reportReturnType]
     if (
         "lineno" in target._attributes  # noqa: SLF001
         and hasattr(source, "lineno")
         and (not hasattr(target, "lineno") or overwrite)
     ):
-        target.lineno = source.lineno  # type: ignore[attr-defined]
+        target.lineno = source.lineno  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
     if (
         "end_lineno" in target._attributes  # noqa: SLF001
         and hasattr(source, "end_lineno")
         and (not hasattr(target, "end_lineno") or overwrite)
     ):
-        target.end_lineno = source.end_lineno  # type: ignore[attr-defined]
+        target.end_lineno = source.end_lineno  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
     if (
         "col_offset" in target._attributes  # noqa: SLF001
         and hasattr(source, "col_offset")
         and (not hasattr(target, "col_offset") or overwrite)
     ):
-        target.col_offset = source.col_offset  # type: ignore[attr-defined]
+        target.col_offset = source.col_offset  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
     if (
         "end_col_offset" in target._attributes  # noqa: SLF001
         and hasattr(source, "end_col_offset")
         and (not hasattr(target, "end_col_offset") or overwrite)
     ):
-        target.end_col_offset = source.end_col_offset  # type: ignore[attr-defined]
+        target.end_col_offset = source.end_col_offset  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
     if recursive:
         for node in ast.iter_child_nodes(target):
             copy_location(source, node, overwrite=overwrite, recursive=recursive)
@@ -112,7 +112,7 @@ def same_location(
         ast.AST | list[ast.AST]
             The result with copied location
         """
-        result = func(self, source, *args, **kwargs)  # type: ignore[return-value]
+        result = func(self, source, *args, **kwargs)  # pyright: ignore[reportReturnType]
         if isinstance(result, list):
             for node in result:
                 copy_location(source, node)
@@ -120,4 +120,4 @@ def same_location(
             copy_location(source, result)
         return result
 
-    return wrapper  # type: ignore[return-value]
+    return wrapper  # pyright: ignore[reportReturnType]
