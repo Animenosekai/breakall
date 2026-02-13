@@ -64,7 +64,7 @@ Incompatible versions:     2
 ### Installation
 
 ```bash
-pip install git+https://github.com/Animenosekai/breakall.git
+pip install --upgrade breakall
 ```
 
 ### Basic Usage
