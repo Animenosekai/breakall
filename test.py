@@ -39,6 +39,7 @@ def breakall_random_count():
     for i in range(10):  # 3 from the outermost loop
         for j in range(10):  # 2 from the innermost loop
             for k in range(10):  # 1 from the innermost loop
+                print("From inner loop")
                 breakall: random_number()
             print("This has a chance of 1/2 to be printed")
 

@@ -3,6 +3,7 @@
 import ast
 import inspect
 import sys
+import warnings
 import typing
 
 from breakall.exceptions import (BreakAllEnvironmentError, BreakAllSyntaxError,
@@ -79,6 +80,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         self._lambdas_names: typing.Dict[ast.Lambda, str] = {}
         "(internal) The last lambda assignments in the scope (mainly for error messages)"
 
+    @same_location
     def visit_Def(self, node: DefinedFunctionType) -> ast.AST:
         """
         Parameters
@@ -125,13 +127,14 @@ class BreakAllTransformer(ast.NodeTransformer):
         """
         try:
             self._functions.append(f"<lambda@{self._lambdas_names[node]}>")
-        except IndexError:
+        except KeyError:
             # This is might be an unassigned lambda function
             self._functions.append("<lambda>")
         node = self.generic_visit(node)
         self._functions.pop()
         return node
 
+    @same_location # type: ignore
     def visit_Loop(self, node: LoopType) -> visit_Loop_ReturnType:
         """
         Parameters
@@ -711,20 +714,37 @@ def enable_breakall(func: typing.Optional[typing.Callable] = None):
             )
         try:
             for name, obj in prev_frame.f_globals.items():
-                if callable(obj) and hasattr(obj, "__globals__"):
-                    prev_frame.f_globals[name] = enable_breakall(obj)
+                if callable(obj):
+                    try:
+                        prev_frame.f_globals[name] = enable_breakall(obj)
+                    except Exception:
+                        warnings.warn(
+                            f"Could not enable the `breakall` statement on the function `{name}`",
+                            RuntimeWarning,
+                        )
         finally:
             del frame
         return
     # Gets the source code of the function
-    source_lines, start_line = inspect.getsourcelines(func)
+    try:
+        source_lines, start_line = inspect.getsourcelines(func)
+    except Exception:
+        source_lines, start_line = [], 0
     if not source_lines:
-        raise BreakAllEnvironmentError(
-            title="No source code found",
-            message="The function source code could not be retrieved",
-            line=start_line,
-            filename=inspect.getsourcefile(func) or "<string>",
-        )
+        try:
+            raise BreakAllEnvironmentError(
+                title="No source code found",
+                message="The function source code could not be retrieved",
+                line=start_line,
+                filename=inspect.getsourcefile(func) or "<string>",
+            )
+        except Exception:
+            raise BreakAllEnvironmentError(
+                title="No source code found",
+                message="The function source code could not be retrieved",
+                line=start_line,
+                filename="<string>",
+            )
     indentation = 0
     for element in source_lines[0]:
         if not element.isspace():

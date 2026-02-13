@@ -7,6 +7,192 @@
 # Test with normal functions, async functions, lambdas.
 # Test with nested functions
 # Test with `for` loops, `while` loops, `async for` loops
-# Test the CLI
 # Test exceptions
+# Test the CLI
 
+import pytest
+import asyncio
+from breakall import enable_breakall
+
+# Test the basic `breakall` statement
+def test_basic_breakall():
+    @enable_breakall
+    def func():
+        result = []
+        for i in range(10):
+            for j in range(10):
+                breakall
+            result.append(i)
+        return result
+    assert func() == []
+
+# Test the basic `breakall: n` statement
+def test_basic_breakall_n():
+    @enable_breakall
+    def func():
+        result = []
+        for i in range(10):
+            for j in range(10):
+                for k in range(10):
+                    breakall: 2
+                result.append(i)
+        return result
+    assert func() == []
+
+# Test the basic `breakall @ n` statement
+def test_basic_breakall_at_n():
+    @enable_breakall
+    def func():
+        result = []
+        for i in range(10):
+            for j in range(10):
+                for k in range(10):
+                    breakall @ 2
+                result.append(i)
+        return result
+    assert func() == []
+
+# Test that there is no way of using `breakall` incorrectly
+def test_invalid_breakall_syntax():
+    def func():
+        for i in range(10):
+            breakall + 1  # Invalid usage
+        return 0
+    with pytest.raises(SyntaxError):
+        enable_breakall(func)
+
+# Test that `breakall: 1` is converted to `break`
+def test_breakall_one_is_break():
+    @enable_breakall
+    def func():
+        result = []
+        for i in range(10):
+            for j in range(10):
+                breakall: 1
+            result.append(i)
+        return result
+    assert func() == list(range(10))
+
+# Test that `breakall @ n` where we are in the n-th loop is converted to `break`
+def test_breakall_at_n_is_break():
+    @enable_breakall
+    def func():
+        result = []
+        for i in range(10):
+            for j in range(10):
+                breakall @ 1
+            result.append(i)
+        return result
+    assert func() == []
+
+async def async_range(count):
+    for i in range(count):
+        yield(i)
+        await asyncio.sleep(0.0)
+
+# Test with normal functions, async functions, lambdas
+@pytest.mark.asyncio
+async def test_async_breakall():
+    @enable_breakall
+    async def func():
+        result = []
+        for i in range(10):
+            for j in range(10):
+                async for k in async_range(10):
+                    breakall: 2
+                result.append(i)
+        return result
+    assert await func() == []
+
+# Test with nested functions
+def test_nested_functions_breakall():
+    @enable_breakall
+    def outer():
+        def inner():
+            for i in range(5):
+                for j in range(5):
+                    breakall: 2
+        inner()
+        return "ok"
+    assert outer() == "ok"
+
+# Test with `for` loops, `while` loops, `async for` loops
+def test_for_loop_breakall():
+    @enable_breakall
+    def func():
+        result = []
+        for i in range(10):
+            for j in range(10):
+                breakall @ 2
+            result.append(i)
+        return result
+    assert func() == list(range(10))
+
+def test_while_loop_breakall():
+    @enable_breakall
+    def func():
+        result = []
+        i = 0
+        while i < 10:
+            j = 0
+            while j < 10:
+                breakall: 2
+            result.append(i)
+            i += 1
+        return result
+    assert func() == []
+
+@pytest.mark.asyncio
+async def test_async_for_loop_breakall():
+    @enable_breakall
+    async def func():
+        result = []
+        for i in range(10):
+            async for j in async_range(10):
+                breakall: 2
+            result.append(i)
+        return result
+    assert await func() == []
+
+# Test exceptions
+def test_breakall_exception():
+    with pytest.raises(Exception):
+        @enable_breakall
+        def func():
+            for i in range(5):
+                for j in range(5):
+                    if i == 2:
+                        raise Exception("Test Exception")
+                    breakall: j
+        func()
+
+# Test `breakall: var` and `breakall: func()`
+def test_breakall_dynamic():
+    @enable_breakall
+    def func():
+        result = []
+        n = 2
+        def get_n():
+            return n
+        for i in range(10):
+            for j in range(10):
+                breakall: get_n()  # Should break 2 loops dynamically
+            result.append(i)
+        return result
+    assert func() == []
+
+# Test `breakall @ var` and `breakall @ func()`
+def test_breakall_at_dynamic():
+    @enable_breakall
+    def func():
+        result = []
+        loop_num = 2
+        def get_loop_num():
+            return loop_num
+        for i in range(10):
+            for j in range(10):
+                for k in range(10):
+                    breakall @ get_loop_num()  # Should break to loop 2 dynamically
+                result.append(i)
+        return result
+    assert func() == []

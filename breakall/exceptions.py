@@ -47,8 +47,9 @@ class BreakAllError(Exception):
         self.indicator = str(indicator)
         super().__init__(self.build_error_body())
 
-    @staticmethod
+    @classmethod
     def from_node(
+        cls,
         title: str,
         message: str,
         node: typing.Union[ast.stmt, ast.expr],
@@ -74,7 +75,7 @@ class BreakAllError(Exception):
         -------
         BreakAllError
         """
-        return BreakAllError(
+        return cls(
             title,
             message,
             filename=filename,
