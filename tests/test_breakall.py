@@ -1,24 +1,31 @@
-# Test the basic `breakall` statement
-# Test the basic `breakall: n` statement
-# Test the basic `breakall @ n` statement
-# Test that there is no way of using `breakall` differently
-# Test that `breakall: 1` breaks is converted to `break`
-# Test that `breakall @ n` where we are in the n-th loop is converted to `break`
-# Test with normal functions, async functions, lambdas.
-# Test with nested functions
-# Test with `for` loops, `while` loops, `async for` loops
-# Test exceptions
-# Test the CLI
+"""
+Comprehensive tests for the breakall statement.
 
-# ruff: noqa: B018, F842
-# pyright: reportUnusedExpression=false, reportUnusedVariable=false
+This module tests:
 
+- The basic `breakall` statement
+- The basic `breakall: n` statement
+- The basic `breakall @ n` statement
+- That there is no way of using `breakall` incorrectly
+- That `breakall: 1` is converted to `break`
+- That `breakall @ n` where we are in the n-th loop is converted to `break`
+- Normal functions, async functions, lambdas
+- Nested functions
+- `for` loops, `while` loops, `async for` loops
+- Exceptions
+- The CLI
+"""
+
+# ruff: noqa: B018, F842, B007, PLR2004
+# pyright: reportUnusedExpression=false, reportUnusedVariable=false, reportGeneralTypeIssues=false, reportInvalidTypeForm=false
 
 import asyncio
+from collections.abc import AsyncGenerator
 
 import pytest
 
 from breakall import breakall, enable_breakall
+from breakall.exceptions import BreakAllRuntimeError
 
 
 # Test the basic `breakall` statement
@@ -75,9 +82,9 @@ def test_basic_breakall_at_n() -> None:
 def test_invalid_breakall_syntax() -> None:
     """Test that using `breakall` with invalid syntax raises a SyntaxError."""
 
-    def func() -> list[int]:
+    def func() -> int:
         for i in range(10):
-            breakall + 1  # Invalid usage
+            breakall + 1  # pyright: ignore[reportOperatorIssue] # Invalid usage
         return 0
 
     with pytest.raises(SyntaxError):
@@ -102,7 +109,7 @@ def test_breakall_one_is_break() -> None:
 
 # Test that `breakall @ n` where we are in the n-th loop is converted to `break`
 def test_breakall_at_n_is_break() -> None:
-    """Test that `breakall @ n` where we are in the n-th loop is converted to `break`."""
+    """Test `breakall @ n` conversion when we are in the n-th loop."""
 
     @enable_breakall
     def func() -> list[int]:
@@ -116,7 +123,7 @@ def test_breakall_at_n_is_break() -> None:
     assert func() == []
 
 
-async def async_range(count) -> int:
+async def async_range(count: int) -> AsyncGenerator[int, None]:
     """Async generator that yields numbers from 0 to count - 1."""
     for i in range(count):
         yield (i)
@@ -211,16 +218,17 @@ async def test_async_for_loop_breakall() -> None:
 # Test exceptions
 def test_breakall_exception() -> None:
     """Test that using `breakall` with invalid syntax raises an Exception."""
-    with pytest.raises(Exception):
 
-        @enable_breakall
-        def func() -> list[int]:
-            for i in range(5):
-                for j in range(5):
-                    if i == 2:
-                        raise Exception("Test Exception")
-                    breakall: j
+    @enable_breakall
+    def func() -> None:
+        for i in range(5):
+            for j in range(5):
+                if i == 2:
+                    msg = "Test Exception"
+                    raise NotImplementedError(msg)
+                breakall: j
 
+    with pytest.raises(BreakAllRuntimeError):
         func()
 
 
@@ -233,7 +241,7 @@ def test_breakall_dynamic() -> None:
         result: list[int] = []
         n = 2
 
-        def get_n():
+        def get_n() -> int:
             return n
 
         for i in range(10):
@@ -254,7 +262,7 @@ def test_breakall_at_dynamic() -> None:
         result: list[int] = []
         loop_num = 2
 
-        def get_loop_num():
+        def get_loop_num() -> int:
             return loop_num
 
         for i in range(10):

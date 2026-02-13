@@ -1,6 +1,6 @@
 """Tests for the coverage of breakall."""
 
-# ruff: noqa: B018, F842
+# ruff: noqa: B018, F842, B007, PLR2004
 # pyright: reportUnusedExpression=false, reportUnusedVariable=false, reportGeneralTypeIssues=false
 
 import sys
@@ -57,8 +57,8 @@ def test_invalid_negative_loop_count() -> None:
     with pytest.raises(BreakAllSyntaxError):
 
         @enable_breakall
-        def func():
-            """"""
+        def func() -> None:
+            """Test function with invalid negative break count."""
             for i in range(10):
                 breakall: -1  # Invalid negative break count
 
@@ -68,8 +68,8 @@ def test_invalid_loop_number() -> None:
     with pytest.raises(BreakAllSyntaxError):
 
         @enable_breakall
-        def func():
-            """"""
+        def func() -> None:
+            """Test function with invalid loop number."""
             for i in range(10):  # Loop 1
                 breakall @ 5  # No such loop (only 1 loop)
 
@@ -104,7 +104,7 @@ def test_function_transformation() -> None:
 
 
 def test_no_source_code() -> None:
-    """Test that enabling `breakall` on a function without source code raises an error."""
+    """Test enabling `breakall` on a function without source code."""
     with pytest.raises(BreakAllEnvironmentError):
         enable_breakall(
             sys.setrecursionlimit,
@@ -137,6 +137,6 @@ def test_invalid_breakall_syntax() -> None:
     with pytest.raises(BreakAllSyntaxError):
 
         @enable_breakall
-        def func():
+        def func() -> None:
             for i in range(10):
                 breakall // 2  # Should raise error

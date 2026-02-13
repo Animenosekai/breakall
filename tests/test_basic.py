@@ -2,7 +2,7 @@
 
 from breakall import breakall, enable_breakall
 
-# ruff: noqa: B018, F842
+# ruff: noqa: B018, F842, B007, PLR2004
 # pyright: reportUnusedExpression=false, reportUnusedVariable=false
 
 
