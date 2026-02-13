@@ -538,7 +538,7 @@ class BreakAllTransformer(ast.NodeTransformer):
     visit_AnnAssign = visit_annotated_assign  # pyright: ignore[reportAssignmentType] # noqa: N815
 
     @same_location
-    def visit_Expr(  # noqa: N802, pyright: ignore[reportIncompatibleMethodOverride]
+    def visit_Expr(
         self,
         node: ast.Expr,
     ) -> ast.AST | list[ast.AST]:
@@ -930,7 +930,7 @@ def enable_breakall(  # noqa: PLR0912
         try:
             for name, obj in prev_frame.f_globals.items():
                 if callable(obj):
-                    obj = typing.cast(SupportsBreakall[typing.Any], obj)
+                    obj = typing.cast("SupportsBreakall[typing.Any]", obj)
                     obj.supports_breakall = False
                     try:
                         prev_frame.f_globals[name] = enable_breakall(obj)
@@ -1009,7 +1009,7 @@ def enable_breakall(  # noqa: PLR0912
         func.supports_breakall = False  # pyright: ignore[reportFunctionMemberAccess]
 
     # Returns the function
-    return typing.cast(SupportsBreakall[Function], func)
+    return typing.cast("SupportsBreakall[Function]", func)
 
 
 def supports_breakall(func: Callable[..., typing.Any]) -> bool:

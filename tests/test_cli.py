@@ -12,7 +12,6 @@ if typing.TYPE_CHECKING:
 
 from breakall.__main__ import main
 
-# ruff: noqa: B018, F842, B007, PLR2004
 # pyright: reportUnusedExpression=false, reportUnusedVariable=false
 
 

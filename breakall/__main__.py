@@ -110,7 +110,7 @@ class BreakallLoader(importlib.abc.Loader):
 
         # If we got source code, transform it
         if source:
-            tree = ast.parse(typing.cast(str, source))
+            tree = ast.parse(typing.cast("str", source))
             # Add the enable_breakall decorator to functions
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -155,6 +155,12 @@ def main(
         finder = BreakallMetaPathFinder()
         sys.meta_path.insert(0, finder)
 
+    # Add the file's directory to sys.path so imports work
+    file_absolute = file.resolve()
+    file_dir = str(file_absolute.parent)
+    if file_dir not in sys.path:
+        sys.path.insert(0, file_dir)
+
     # Reading the source code
     source = file.read_text()
 
@@ -174,7 +180,9 @@ def main(
     tree = ast.fix_missing_locations(tree)
 
     # Compiling and executing the code
-    code = compile(tree, str(file), "exec")
+    code = compile(tree, str(file_absolute), "exec")
+    # Update GLOBAL_ENV with __file__ for the executed code
+    GLOBAL_ENV["__file__"] = str(file_absolute)
     exec(code, GLOBAL_ENV, None)  # noqa: S102
 
     # Writing the modified code
