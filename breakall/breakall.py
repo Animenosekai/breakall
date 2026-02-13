@@ -825,7 +825,9 @@ def fix_source(
     # Avoid having big stack traces for a SyntaxError on the user's side
     sys.excepthook = exception_hook
     tree = BreakAllTransformer(
-        filename=filename, start_line=start_line, globals=globals
+        filename=filename,
+        start_line=start_line,
+        globals=globals,
     ).visit(tree)
     # Restore the previous behavior for performance reasons
     sys.excepthook = sys.__excepthook__

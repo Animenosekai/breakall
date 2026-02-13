@@ -1,8 +1,8 @@
 # TODO
 
-[~] Create a CLI to directly run Python code without putting the decorator  
+[x] Create a CLI to directly run Python code without putting the decorator  
 [x] Test on `async def`, `async for`  
-[ ] Look at the support for having the `enable_breakall` decorator named differently  
+[x] Look at the support for having the `enable_breakall` decorator named differently  
 [x] Support non-literal breakall statements
 [x] Hide the traceback for SyntaxError  
 [x] Make a custom inheritant of `SyntaxError`  
