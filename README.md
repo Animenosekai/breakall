@@ -19,6 +19,9 @@
 ![Repo Size](https://img.shields.io/github/repo-size/Animenosekai/breakall)
 ![Issues](https://img.shields.io/github/issues/Animenosekai/breakall)
 
+> [!NOTE]  
+> This basically implements the idea behind [PEP 3136 – Labeled break and continue](https://peps.python.org/pep-3136/).
+
 ## Index
 
 - [Break from multiple loops at once in Python](#break-from-multiple-loops-at-once-in-python)
