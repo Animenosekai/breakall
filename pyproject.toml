@@ -6,7 +6,7 @@ authors = [{ name = "Animenosekai", email = "animenosekai.mail@gmail.com" }]
 maintainers = [{ name = "Animenosekai", email = "animenosekai.mail@gmail.com" }]
 license = { text = "MIT" }
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["animenosekai", "breakall", "loops", "break"]
 classifiers = [
     "Development Status :: 4 - Beta",

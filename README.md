@@ -51,16 +51,16 @@
 
 ### Prerequisites
 
-You will need Python +3.9 to run this module
+You will need Python +3.10 to run this module
 
 ```bash
 # vermin output
-Minimum required versions: 3.9
+Minimum required versions: 3.10
 Incompatible versions:     2
 ```
 
 > [!NOTE]  
-> The heavy use of `ast.unparse` makes this incompatible with Python version lower than 3.9
+> The heavy use of `ast.unparse` makes this incompatible with Python version lower than 3.10
 
 ### Installation
 
