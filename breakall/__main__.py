@@ -6,10 +6,11 @@ import argparse
 import ast
 import pathlib
 from pathlib import Path
+from typing import Any
 
 import breakall
 
-GLOBAL_ENV = {"breakall": breakall, "__name__": "__main__"}
+GLOBAL_ENV: dict[str, Any] = {"breakall": breakall, "__name__": "__main__"}
 
 
 def main(file: pathlib.Path, output: str | None = None) -> None:
@@ -71,4 +72,4 @@ def entry() -> None:
         help="If provided, will write the modified source code to the provided file.",
     )
     args = parser.parse_args()
-    main(file=pathlib.Path(args.file), output=args.output)
+    main(file=args.file, output=args.output)

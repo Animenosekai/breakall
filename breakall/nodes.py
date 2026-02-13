@@ -9,12 +9,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-SourceASTNode = typing.TypeVar("SourceASTNode", bound=ast.AST)
 TargetASTNode = typing.TypeVar("TargetASTNode", bound=ast.AST)
 
 
 def copy_location(
-    source: SourceASTNode,
+    source: ast.AST,
     target: TargetASTNode,
     *,
     overwrite: bool = True,
@@ -25,7 +24,7 @@ def copy_location(
 
     Parameters
     ----------
-    source : SourceASTNode
+    source : ast.AST
         The node to copy from
     target : TargetASTNode
         The node where the location is copied to
@@ -40,7 +39,7 @@ def copy_location(
         The target node with copied location data
     """
     if source == target:
-        return target
+        return target  # type: ignore[return-value]
     if (
         "lineno" in target._attributes  # noqa: SLF001
         and hasattr(source, "lineno")
@@ -72,34 +71,28 @@ def copy_location(
 
 
 def same_location(
-    func: Callable[
-        [typing.Any, SourceASTNode],
-        list[TargetASTNode] | TargetASTNode,
-    ],
-) -> Callable[
-    [typing.Any, SourceASTNode],
-    list[TargetASTNode] | TargetASTNode,
-]:
+    func: Callable[..., ast.AST | list[ast.AST]],
+) -> Callable[..., ast.AST | list[ast.AST]]:
     """
     Decorate a function to copy the location of the first argument to return values.
 
     Parameters
     ----------
-    func : Callable[[typing.Any, SourceASTNode], list[TargetASTNode] | TargetASTNode]
+    func : Callable[..., ast.AST | list[ast.AST]]
         The function to decorate
 
     Returns
     -------
-    Callable[[typing.Any, SourceASTNode], list[TargetASTNode] | TargetASTNode]
+    Callable[..., ast.AST | list[ast.AST]]
         The decorated function
     """
 
     def wrapper(
         self: typing.Any,  # noqa: ANN401
-        source: SourceASTNode,
+        source: ast.AST,
         *args: typing.Any,  # noqa: ANN401
         **kwargs: typing.Any,  # noqa: ANN401
-    ) -> list[TargetASTNode] | TargetASTNode:
+    ) -> ast.AST | list[ast.AST]:
         """
         Wrap a function to copy location data.
 
@@ -107,7 +100,7 @@ def same_location(
         ----------
         self : typing.Any
             The self parameter
-        source : SourceASTNode
+        source : ast.AST
             The source AST node
         *args : typing.Any
             Additional arguments
@@ -116,10 +109,10 @@ def same_location(
 
         Returns
         -------
-        list[TargetASTNode] | TargetASTNode
+        ast.AST | list[ast.AST]
             The result with copied location
         """
-        result = func(self, source, *args, **kwargs)
+        result = func(self, source, *args, **kwargs)  # type: ignore[return-value]
         if isinstance(result, list):
             for node in result:
                 copy_location(source, node)
@@ -127,4 +120,4 @@ def same_location(
             copy_location(source, result)
         return result
 
-    return wrapper
+    return wrapper  # type: ignore[return-value]

@@ -29,7 +29,7 @@ DefinedFunctionType = typing.TypeVar(
     ast.AsyncFunctionDef,
 )
 "The type of the defined function in the AST"
-LoopType = typing.Union[ast.For, ast.While, ast.AsyncFor]
+LoopType = ast.For | ast.While | ast.AsyncFor
 "The type of the loop in the AST"
 
 
@@ -81,6 +81,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         start_line : int, optional
             The starting line of the function in the source code, by default 0
         """
+        super().__init__()
         self.filename = str(filename)
         "Filename of the source code (mainly for error messages)"
         self.start_line = int(start_line)
@@ -95,7 +96,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         "(internal) The last lambda assignments in the scope"
 
     @same_location
-    def visit_def(self, node: DefinedFunctionType) -> ast.AST:
+    def visit_def(self, node: DefinedFunctionType) -> ast.AST:  # type: ignore[override]
         """
         Visit a function definition node.
 
@@ -109,7 +110,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         ast.AST
             The modified node
         """
-        decorators = []
+        decorators: list[ast.expr] = []
         for decorator in node.decorator_list:
             if (
                 isinstance(decorator, ast.Name)
@@ -119,18 +120,18 @@ class BreakAllTransformer(ast.NodeTransformer):
             decorators.append(decorator)
         node.decorator_list = decorators
         self._functions.append(node.name)
-        node = self.generic_visit(node)
+        node = self.generic_visit(node)  # type: ignore[assignment]
         self._functions.pop()
         return node
 
-    visit_FunctionDef = visit_def  # noqa: N815
-    visit_AsyncFunctionDef = visit_def  # noqa: N815
+    visit_FunctionDef = visit_def  # type: ignore[assignment] # noqa: N815
+    visit_AsyncFunctionDef = visit_def  # type: ignore[assignment] # noqa: N815
     visit_Loop_ReturnType: typing.TypeAlias = (  # noqa: PYI042, N815
         list[ast.Assign | ast.Try] | LoopType | ast.stmt | list[ast.stmt]
     )
 
-    @same_location
-    def visit_lambda(self, node: ast.Lambda) -> ast.AST:
+    @same_location  # type: ignore[no-untyped-def]
+    def visit_lambda(self, node: ast.Lambda) -> ast.AST:  # type: ignore[override]
         """
         Visit a lambda node.
 
@@ -147,14 +148,14 @@ class BreakAllTransformer(ast.NodeTransformer):
         try:
             self._functions.append(f"<lambda@{self._lambdas_names[node]}>")
         except KeyError:
-            # This is might be an unassigned lambda function
+            # This might be an unassigned lambda function
             self._functions.append("<lambda>")
-        node = self.generic_visit(node)
+        node = self.generic_visit(node)  # type: ignore[assignment]
         self._functions.pop()
         return node
 
     @same_location  # type: ignore[no-untyped-def]
-    def visit_loop(
+    def visit_loop(  # type: ignore[override]
         self,
         node: LoopType,
     ) -> visit_Loop_ReturnType:
@@ -172,9 +173,7 @@ class BreakAllTransformer(ast.NodeTransformer):
             The modified node(s)
         """
         self._loop_counter += 1
-        loop_body: ast.stmt | list[ast.stmt] = self.generic_visit(
-            node,
-        )
+        loop_body: ast.stmt | list[ast.stmt] = self.generic_visit(node)  # type: ignore[assignment]
         result: BreakAllTransformer.visit_Loop_ReturnType
         if self._loop_counter in self._usage:
             assignment = ast.Assign(
@@ -212,12 +211,12 @@ class BreakAllTransformer(ast.NodeTransformer):
         self._loop_counter -= 1
         return result
 
-    visit_For = visit_loop  # noqa: N815
-    visit_While = visit_loop  # noqa: N815
-    visit_AsyncFor = visit_loop  # noqa: N815
+    visit_For = visit_loop  # type: ignore[assignment] # noqa: N815
+    visit_While = visit_loop  # type: ignore[assignment] # noqa: N815
+    visit_AsyncFor = visit_loop  # type: ignore[assignment] # noqa: N815
 
     @same_location
-    def visit_assign(self, node: ast.Assign) -> ast.AST:
+    def visit_assign(self, node: ast.Assign) -> ast.AST:  # type: ignore[override]
         """
         Visit an assignment node.
 
@@ -250,10 +249,10 @@ class BreakAllTransformer(ast.NodeTransformer):
                 except IndexError:
                     # `index` might be out of bound, which shouldn't happen?
                     break
-        return self.generic_visit(node)
+        return self.generic_visit(node)  # type: ignore[return-value]
 
     @same_location
-    def visit_annotated_assign(
+    def visit_annotated_assign(  # type: ignore[override]
         self,
         node: ast.AnnAssign,
     ) -> ast.AST | list[ast.AST]:
@@ -385,7 +384,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                     ),
                 ]
             try:
-                parsed_break_count = int(node.annotation.value)
+                parsed_break_count = int(node.annotation.value)  # type: ignore[arg-type]
             except Exception as exc:
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid break count",
@@ -439,7 +438,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         return self.generic_visit(node)
 
     @same_location
-    def visit_Expr(  # noqa: N802
+    def visit_Expr(  # noqa: N802, type: ignore[override]
         self,
         node: ast.Expr,
     ) -> ast.AST | list[ast.AST]:
@@ -482,7 +481,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                 type[ast.operator | ast.unaryop],
                 str,
             ] = {ast.UAdd: "+", ast.USub: "-", ast.Not: "not", ast.Invert: "~"}
-            operator_repr = operator_repr_map.get(
+            operator_repr = operator_repr_map.get(  # type: ignore[arg-type]
                 type(node.value.op),
                 ast.unparse(node.value.op),
             )
@@ -504,7 +503,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         value = node.value
         if isinstance(value.left, ast.Name) and value.left.id == "breakall":
             if not isinstance(value.op, ast.MatMult):
-                binop_repr_map = {
+                binop_repr_map: dict[type[ast.operator], str] = {  # type: ignore[misc]
                     ast.Add: "+",
                     ast.Sub: "-",
                     ast.Mult: "*",
@@ -518,11 +517,11 @@ class BreakAllTransformer(ast.NodeTransformer):
                     ast.BitAnd: "&",
                     ast.FloorDiv: "//",
                 }
-                operator_repr = binop_repr_map.get(
+                operator_repr = binop_repr_map.get(  # type: ignore[arg-type]
                     type(value.op),
                     ast.unparse(value.op),
                 )
-                operator_length = len(operator_repr)
+                operator_length: int = len(operator_repr)  # type: ignore[arg-type]
                 # + 1 for the space before the operator
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid break operation",
@@ -636,7 +635,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                     ),
                 ]
             try:
-                parsed_loop_number = int(value.right.value)
+                parsed_loop_number = int(value.right.value)  # type: ignore[arg-type]
             except Exception as exc:
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid loop number",
@@ -749,8 +748,8 @@ def fix_source(
 
 
 def enable_breakall(  # noqa: PLR0912
-    func: Callable | None = None,
-) -> Callable | None:
+    func: Callable[..., typing.Any] | None = None,
+) -> Callable[..., typing.Any] | None:
     """
     Enable the `breakall` statement on the given function.
 
@@ -764,12 +763,12 @@ def enable_breakall(  # noqa: PLR0912
 
     Parameters
     ----------
-    func : Callable | None, optional
+    func : Callable[..., Any] | None, optional
         The function to enable the `breakall` statement on, by default None
 
     Returns
     -------
-    Callable | None
+    Callable[..., Any] | None
         The enabled function or None if called as a decorator factory
 
     Raises
@@ -842,7 +841,7 @@ def enable_breakall(  # noqa: PLR0912
     # Compile the fixed source code
     compiled = compile(tree, filename, "exec")
     # Executes the compiled source code (module)
-    output: dict = {}
+    output: dict[str, typing.Any] = {}
     exec(compiled, func.__globals__, output)  # noqa: S102
     # Gets the function from the module
     for name, obj in output.items():
@@ -857,13 +856,13 @@ def enable_breakall(  # noqa: PLR0912
     return func
 
 
-def supports_breakall(func: Callable) -> bool:
+def supports_breakall(func: Callable[..., typing.Any]) -> bool:
     """
     Check if a function supports the `breakall` statement.
 
     Parameters
     ----------
-    func : Callable
+    func : Callable[..., Any]
         The function to check
 
     Returns
@@ -872,4 +871,4 @@ def supports_breakall(func: Callable) -> bool:
         Whether the function supports the `breakall` statement
     """
     # Maybe also check the AST
-    return hasattr(func, "supports_breakall") and func.supports_breakall
+    return hasattr(func, "supports_breakall") and func.supports_breakall  # type: ignore[attr-defined]
