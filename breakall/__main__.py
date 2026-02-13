@@ -1,25 +1,30 @@
-"""The CLI for the `breakall` module"""
+"""The CLI for the `breakall` module."""
+
+from __future__ import annotations
 
 import argparse
 import ast
 import pathlib
-import typing
+from pathlib import Path
 
 import breakall
 
 GLOBAL_ENV = {"breakall": breakall, "__name__": "__main__"}
 
 
-def main(file: pathlib.Path, output: typing.Optional[str] = None) -> None:
+def main(file: pathlib.Path, output: str | None = None) -> None:
     """
+    Execute the breakall statement on the given file.
+
     Parameters
     ----------
-    file: Path
-    output: NoneType | str, default = None
+    file : pathlib.Path
+        The file to execute
+    output : str | None, optional
+        The output file path (or '-' for stdout), by default None
     """
     # Reading the source code
-    with open(file) as f:
-        source = f.read()
+    source = file.read_text()
     # Parsing it
     tree = ast.parse(source)
     # Adding the enable_breakall decorator to the functions
@@ -34,20 +39,19 @@ def main(file: pathlib.Path, output: typing.Optional[str] = None) -> None:
             )
     tree = ast.fix_missing_locations(tree)
     # Compiling and executing the code
-    code = compile(tree, file, "exec")
-    exec(code, GLOBAL_ENV, None)
+    code = compile(tree, str(file), "exec")
+    exec(code, GLOBAL_ENV, None)  # noqa: S102
     # Writing the modified code
     if output:
         result = ast.unparse(tree)
         if output == "-":
-            print(result)
+            print(result)  # noqa: T201
         else:
-            with open(output, "w") as f:
-                f.write(result)
+            Path(output).write_text(result)
 
 
 def entry() -> None:
-    """The main entry point of the module"""
+    """Start the CLI application."""
     parser = argparse.ArgumentParser(
         prog="breakall",
         description="Break from multiple loops at once in Python",
@@ -55,7 +59,10 @@ def entry() -> None:
     parser.add_argument("file", help="The file to run", type=pathlib.Path)
     # parser.add_argument(
     #     "--trace",
-    #     help="Enable tracing. This WILL slow down the execution of the program but will hook and modify every function call.",
+    #     help=(
+    #         "Enable tracing. This WILL slow down execution but will hook "
+    #         "and modify every function call."
+    #     ),
     #     action="store_true",
     #     default=False,
     # )

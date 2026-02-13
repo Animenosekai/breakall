@@ -1,5 +1,5 @@
 """
-Enables the `breakall` statement in Python which allows you to break multiple loops at once.
+Enable the `breakall` statement in Python to break multiple loops at once.
 
 Example:
 -------

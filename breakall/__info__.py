@@ -9,11 +9,11 @@ __repository__ = "https://github.com/Animenosekai/breakall"
 
 # Module
 __module__ = "breakall"
-__status__ = "Alpha"
-__year__ = 2024
+__status__ = "Beta"
+__year__ = 2026
 __license__ = "MIT License"
 
 __copyright__ = f"Copyright {__year__}, {__module__}"
 
-# PEP 440 Compilant
+# PEP 440 Compliant
 __version__ = "1.0rc1"
