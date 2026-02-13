@@ -157,8 +157,10 @@ def main(
 
     # Reading the source code
     source = file.read_text()
+
     # Parsing it
     tree = ast.parse(source)
+
     # Adding the enable_breakall decorator to the functions
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -170,9 +172,11 @@ def main(
                 ),
             )
     tree = ast.fix_missing_locations(tree)
+
     # Compiling and executing the code
     code = compile(tree, str(file), "exec")
     exec(code, GLOBAL_ENV, None)  # noqa: S102
+
     # Writing the modified code
     if output:
         result = ast.unparse(tree)

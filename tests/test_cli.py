@@ -275,7 +275,7 @@ def outer():
                 count += 1
                 breakall
         return count
-    
+
     result = inner()
     print(f"Nested result: {result}")
 

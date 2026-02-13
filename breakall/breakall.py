@@ -30,32 +30,51 @@ class SupportsAt(str):
 
     __slots__ = ()
 
-    def __matmul__(self, other: int) -> str:
+    def __matmul__(self, index: int) -> str:
         """
-        Support for the `@` operator with the `breakall` statement.
+        Break to the loop with the specified loop number.
 
         Example
         -------
-        >>> node = SupportsAt("breakall")
-        >>> node @ 2
-        'breakall @ 2'
+        >>> for i in range(n): # Loop 1
+        ...     for j in range(m): # Loop 2
+        ...         for k in range(p): # Loop 3
+        ...             breakall @ 2
+        ...             print("in k")
+        ...         print("in j")
+        ...     print("in i")
+        # This will not print "in k" but will print "in j" and "in i".
 
         Parameters
         ----------
-        other : int
-            The right-hand side of the `@` operator
+        index : int
+            The index of the loop to break to. `1` is the outermost loop.
 
         Returns
         -------
         str
             The result of the `@` operation
         """
-        return f"breakall @ {other}"
+        return f"breakall @ {index}"
 
 
 # This is here only to make type checkers happy
 breakall = SupportsAt("breakall")
-"The `breakall` statement. You can import this to make the type checkers happy."
+"""
+The `breakall` statement.
+
+This is the main statement that allows breaking from multiple loops at once.
+
+Example
+-------
+>>> for i in range(n): # Loop 1
+...     for j in range(m): # Loop 2
+...         breakall
+...         print("in j")
+...     print("in i")
+# This will not print "in i" or "in j".
+"""
+
 # Type definitions
 DefinedFunctionType = typing.TypeVar(
     "DefinedFunctionType",
