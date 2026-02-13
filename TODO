@@ -1,14 +1,14 @@
 # TODO
 
-[ ] Create a CLI to directly run Python code without putting the decorator  
-[ ] Test on `async def`, `async for`  
+[~] Create a CLI to directly run Python code without putting the decorator  
+[x] Test on `async def`, `async for`  
 [ ] Look at the support for having the `enable_breakall` decorator named differently  
 [x] Support non-literal breakall statements
 [x] Hide the traceback for SyntaxError  
 [x] Make a custom inheritant of `SyntaxError`  
 [x] Add support for `lambda` functions  
 [x] Remove code modification when it is not useful  
-[ ] WONTFIX: Fix the line number in the traceback/code when a modified function is ran  [^1]
+[~] WONTFIX: Fix the line number in the traceback/code when a modified function is ran  [^1]
 
 ## Optimisation
 
