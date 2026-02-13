@@ -2,7 +2,7 @@ from breakall import enable_breakall, supports_breakall
 
 
 @enable_breakall
-def test_breakall_basic():
+def test_breakall_basic() -> None:
     """"""
     count = 0
     for i in range(10):
@@ -13,7 +13,7 @@ def test_breakall_basic():
 
 
 @enable_breakall
-def test_breakall_n_loops():
+def test_breakall_n_loops() -> None:
     """"""
     count = 0
     for i in range(10):  # Outer loop
@@ -27,7 +27,7 @@ def test_breakall_n_loops():
 
 
 @enable_breakall
-def test_breakall_at_n():
+def test_breakall_at_n() -> None:
     """"""
     count = 0
     for i in range(10):  # Loop 1
@@ -43,10 +43,11 @@ def test_breakall_at_n():
 
 
 import pytest
-from breakall.exceptions import BreakAllRuntimeError, BreakAllSyntaxError
+
+from breakall.exceptions import BreakAllSyntaxError
 
 
-def test_invalid_negative_loop_count():
+def test_invalid_negative_loop_count() -> None:
     """"""
     with pytest.raises(BreakAllSyntaxError):
 
@@ -54,10 +55,10 @@ def test_invalid_negative_loop_count():
         def func():
             """"""
             for i in range(10):
-                breakall: "-1"  # Invalid negative break count
+                breakall: -1  # Invalid negative break count
 
 
-def test_invalid_loop_number():
+def test_invalid_loop_number() -> None:
     """"""
     with pytest.raises(BreakAllSyntaxError):
 
@@ -79,12 +80,12 @@ def decorated_function():
     return count
 
 
-def test_decorated_function():
+def test_decorated_function() -> None:
     """"""
     assert decorated_function() == 1  # Function should break all loops
 
 
-def test_function_transformation():
+def test_function_transformation() -> None:
     """"""
 
     @enable_breakall
@@ -99,20 +100,19 @@ def test_function_transformation():
 
 import sys
 
-import pytest
 from breakall.exceptions import BreakAllEnvironmentError
 
 
-def test_no_source_code():
+def test_no_source_code() -> None:
     """"""
     with pytest.raises(BreakAllEnvironmentError):
         enable_breakall(
-            sys.setrecursionlimit
+            sys.setrecursionlimit,
         )  # Can't retrieve the Python source code of a built-in function
 
 
 @enable_breakall
-def test_single_loop():
+def test_single_loop() -> None:
     """"""
     count = 0
     for i in range(10):
@@ -122,7 +122,7 @@ def test_single_loop():
 
 
 @enable_breakall
-def test_no_iterations():
+def test_no_iterations() -> None:
     """"""
     count = 0
     for i in range(0):  # No iterations
@@ -132,12 +132,11 @@ def test_no_iterations():
     assert count == 0  # No loops should run
 
 
-
-def test_invalid_breakall_syntax():
+def test_invalid_breakall_syntax() -> None:
     """"""
     with pytest.raises(BreakAllSyntaxError):
+
         @enable_breakall
         def func():
             for i in range(10):
-                breakall // 2 # Should raise error
-
+                breakall // 2  # Should raise error

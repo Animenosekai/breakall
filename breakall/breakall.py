@@ -19,8 +19,42 @@ from breakall.exceptions import (
 )
 from breakall.nodes import same_location
 
+
+class SupportsAt(str):
+    """
+    A type for AST nodes that support the `@` operator.
+
+    This is mainly for type checkers to recognize that a node supports the `@`
+    operator when it is used in the context of the `breakall` statement.
+    """
+
+    __slots__ = ()
+
+    def __matmul__(self, other: int) -> str:
+        """
+        Support for the `@` operator with the `breakall` statement.
+
+        Example
+        -------
+        >>> node = SupportsAt("breakall")
+        >>> node @ 2
+        'breakall @ 2'
+
+        Parameters
+        ----------
+        other : int
+            The right-hand side of the `@` operator
+
+        Returns
+        -------
+        str
+            The result of the `@` operation
+        """
+        return f"breakall @ {other}"
+
+
 # This is here only to make type checkers happy
-breakall = "breakall"
+breakall = SupportsAt("breakall")
 "The `breakall` statement. You can import this to make the type checkers happy."
 # Type definitions
 DefinedFunctionType = typing.TypeVar(
@@ -747,9 +781,39 @@ def fix_source(
     return tree
 
 
+Function = typing.TypeVar("Function", bound=typing.Callable[..., typing.Any])
+
+
+class SupportsBreakall(typing.Protocol, typing.Generic[Function]):
+    """
+    A type for callables that can be enabled with `enable_breakall`.
+
+    This is mainly for type checkers to recognize that a function supports the
+    `breakall` statement after being enabled with `enable_breakall`.
+    """
+
+    __call__: Function
+    """The call method of the function"""
+    __globals__: dict[str, typing.Any]
+    """The global scope of the function"""
+    __name__: str
+    """The name of the function"""
+
+    supports_breakall: bool
+    "Whether the function supports the `breakall` statement"
+
+
+@typing.overload
+def enable_breakall() -> None: ...
+
+
+@typing.overload
+def enable_breakall(func: Function) -> SupportsBreakall[Function]: ...
+
+
 def enable_breakall(  # noqa: PLR0912
-    func: Callable[..., typing.Any] | None = None,
-) -> Callable[..., typing.Any] | None:
+    func: Function | None = None,
+) -> SupportsBreakall[Function] | None:
     """
     Enable the `breakall` statement on the given function.
 
@@ -763,12 +827,12 @@ def enable_breakall(  # noqa: PLR0912
 
     Parameters
     ----------
-    func : Callable[..., Any] | None, optional
+    func : Function | None, optional
         The function to enable the `breakall` statement on, by default None
 
     Returns
     -------
-    Callable[..., Any] | None
+    SupportsBreakall | None
         The enabled function or None if called as a decorator factory
 
     Raises
@@ -793,6 +857,8 @@ def enable_breakall(  # noqa: PLR0912
         try:
             for name, obj in prev_frame.f_globals.items():
                 if callable(obj):
+                    obj = typing.cast(SupportsBreakall[typing.Any], obj)
+                    obj.supports_breakall = False
                     try:
                         prev_frame.f_globals[name] = enable_breakall(obj)
                     except Exception:  # noqa: BLE001
@@ -835,14 +901,18 @@ def enable_breakall(  # noqa: PLR0912
     source = ""
     for line in source_lines:
         source += line[indentation:]
+
     # Fixes the source code
     filename = inspect.getsourcefile(func) or "<string>"
     tree = fix_source(source, filename=filename, start_line=start_line)
+
     # Compile the fixed source code
     compiled = compile(tree, filename, "exec")
+
     # Executes the compiled source code (module)
     output: dict[str, typing.Any] = {}
     exec(compiled, func.__globals__, output)  # noqa: S102, pyright: ignore[reportUnknownArgumentType]
+
     # Gets the function from the module
     for name, obj in output.items():
         if name == func.__name__:
@@ -852,8 +922,9 @@ def enable_breakall(  # noqa: PLR0912
             break
     else:
         func.supports_breakall = False  # pyright: ignore[reportFunctionMemberAccess]
+
     # Returns the function
-    return func
+    return typing.cast(SupportsBreakall[Function], func)
 
 
 def supports_breakall(func: Callable[..., typing.Any]) -> bool:

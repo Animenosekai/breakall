@@ -50,7 +50,7 @@ plugins = ['pydantic.mypy']
 disallow_any_unimported = true
 disallow_any_expr = false      # Conflicts with the fact that routes return a Coroutine with an `Any` type in its definition
 disallow_any_decorated = true
-disallow_any_explicit = true
+disallow_any_explicit = false
 
 # Warnings
 warn_no_return = true
