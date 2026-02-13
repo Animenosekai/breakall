@@ -13,7 +13,6 @@
 [![PyPI - Status](https://img.shields.io/pypi/status/breakall)](https://pypi.org/project/breakall/)
 [![GitHub - License](https://img.shields.io/github/license/Animenosekai/breakall)](https://github.com/Animenosekai/breakall/blob/master/LICENSE)
 [![GitHub Top Language](https://img.shields.io/github/languages/top/Animenosekai/breakall)](https://github.com/Animenosekai/breakall)
-[![CodeQL](https://github.com/Animenosekai/breakall/actions/workflows/codeql.yml/badge.svg)](https://github.com/Animenosekai/breakall/actions/workflows/codeql.yml)
 [![CI](https://github.com/Animenosekai/breakall/actions/workflows/ci.yml/badge.svg)](https://github.com/Animenosekai/breakall/actions/workflows/ci.yml)
 [![Code Coverage](https://codecov.io/gh/Animenosekai/breakall/branch/main/graph/badge.svg)](https://codecov.io/gh/Animenosekai/breakall)
 ![Code Size](https://img.shields.io/github/languages/code-size/Animenosekai/breakall)
