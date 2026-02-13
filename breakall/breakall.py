@@ -188,6 +188,8 @@ class BreakAllTransformer(ast.NodeTransformer):
         self._functions.pop()
         return node
 
+    visit_Lambda = visit_lambda  # pyright: ignore[reportAssignmentType] # noqa: N815
+
     @same_location  # pyright: ignore[reportArgumentType]
     def visit_loop(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
@@ -285,6 +287,8 @@ class BreakAllTransformer(ast.NodeTransformer):
                     break
         return self.generic_visit(node)  # pyright: ignore[reportReturnType]
 
+    visit_Assign = visit_assign  # pyright: ignore[reportAssignmentType] # noqa: N815
+
     @same_location
     def visit_annotated_assign(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
@@ -318,7 +322,14 @@ class BreakAllTransformer(ast.NodeTransformer):
         """
         # If the `breakall` statement also has a break count
         if isinstance(node.target, ast.Name) and node.target.id == "breakall":
-            if not isinstance(node.annotation, ast.Constant):
+            # Check if the annotation is a constant or a simple unary operation on a constant
+            is_static_value = isinstance(node.annotation, ast.Constant) or (
+                isinstance(node.annotation, ast.UnaryOp)
+                and isinstance(node.annotation.op, (ast.UAdd, ast.USub))
+                and isinstance(node.annotation.operand, ast.Constant)
+            )
+            
+            if not is_static_value:
                 # Any loop up until this point can be broken
                 self._usage.update(range(1, self._loop_counter + 1))
                 return [
@@ -418,14 +429,26 @@ class BreakAllTransformer(ast.NodeTransformer):
                     ),
                 ]
             try:
-                parsed_break_count = int(node.annotation.value)  # pyright: ignore[reportArgumentType]
+                # Extract the integer value from the annotation
+                if isinstance(node.annotation, ast.Constant):
+                    parsed_break_count = int(node.annotation.value)  # pyright: ignore[reportArgumentType]
+                elif isinstance(node.annotation, ast.UnaryOp):
+                    # Handle negative/positive numbers like -1, +2, etc.
+                    operand_value = int(node.annotation.operand.value)  # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
+                    if isinstance(node.annotation.op, ast.USub):
+                        parsed_break_count = -operand_value
+                    else:  # UAdd
+                        parsed_break_count = operand_value
+                else:
+                    raise ValueError("Unexpected annotation type")
             except Exception as exc:
+                annotation_str = ast.unparse(node.annotation)
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid break count",
-                    message=(f"Cannot parse the break count `{node.annotation.value}`"),
+                    message=(f"Cannot parse the break count `{annotation_str}`"),
                     node=node,
                     spacing=len(node.target.id) + 2,
-                    error_length=len(repr(node.annotation.value)),
+                    error_length=len(annotation_str),
                     filename=self.filename,
                     function=".".join(self._functions),
                 ) from exc
@@ -433,12 +456,13 @@ class BreakAllTransformer(ast.NodeTransformer):
                 # Little optimization
                 return ast.Break()
             if parsed_break_count < 1:
+                annotation_str = ast.unparse(node.annotation)
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid break count",
                     message="The break count must be greater than 0",
                     node=node,
                     spacing=len(node.target.id) + 2,
-                    error_length=len(repr(node.annotation.value)),
+                    error_length=len(annotation_str),
                     filename=self.filename,
                     function=".".join(self._functions),
                 ) from None
@@ -446,6 +470,7 @@ class BreakAllTransformer(ast.NodeTransformer):
             if destination < 1:
                 plural = "" if self._loop_counter == 1 else "s"
                 is_or_are = "is" if self._loop_counter == 1 else "are"
+                annotation_str = ast.unparse(node.annotation)
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid break count",
                     message=(
@@ -454,7 +479,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                     ),
                     node=node,
                     spacing=len(node.target.id) + 2,
-                    error_length=len(repr(node.annotation.value)),
+                    error_length=len(annotation_str),
                     filename=self.filename,
                     function=".".join(self._functions),
                 ) from None
@@ -470,6 +495,8 @@ class BreakAllTransformer(ast.NodeTransformer):
         if isinstance(node.value, ast.Lambda) and isinstance(node.target, ast.Name):
             self._lambdas_names[node.value] = node.target.id
         return self.generic_visit(node)
+
+    visit_AnnAssign = visit_annotated_assign  # pyright: ignore[reportAssignmentType] # noqa: N815
 
     @same_location
     def visit_Expr(  # noqa: N802, pyright: ignore[reportIncompatibleMethodOverride]
