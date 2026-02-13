@@ -14,6 +14,7 @@ This module tests:
 - `for` loops, `while` loops, `async for` loops
 - Exceptions
 - The CLI
+- enable_breakall decorator aliases
 """
 
 # ruff: noqa: B018, F842, B007, PLR2004
@@ -25,6 +26,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from breakall import breakall, enable_breakall
+from breakall import enable_breakall as eb
 from breakall.exceptions import BreakAllRuntimeError
 
 
@@ -270,6 +272,23 @@ def test_breakall_at_dynamic() -> None:
                 for k in range(10):
                     breakall @ get_loop_num()  # Should break to loop 2 dynamically
                 result.append(i)
+        return result
+
+    assert func() == []
+
+
+# Test decorator aliases
+# Note: You can't import the enable_breakall decorator locally (inside a test function)
+def test_decorator_alias_short() -> None:
+    """Test that `breakall` works with a short alias decorator name."""
+
+    @eb
+    def func() -> list[int]:
+        result: list[int] = []
+        for i in range(10):
+            for j in range(10):
+                breakall
+            result.append(i)
         return result
 
     assert func() == []

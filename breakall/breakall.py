@@ -104,7 +104,12 @@ class BreakAllTransformer(ast.NodeTransformer):
     BreakAllSyntaxError
     """
 
-    def __init__(self, filename: str = "<string>", start_line: int = 0) -> None:
+    def __init__(
+        self,
+        filename: str = "<string>",
+        start_line: int = 0,
+        globals: dict[str, typing.Any] | None = None,  # noqa: A002
+    ) -> None:
         """
         Initialize the BreakAllTransformer.
 
@@ -114,6 +119,8 @@ class BreakAllTransformer(ast.NodeTransformer):
             The filename of the source code, by default "<string>"
         start_line : int, optional
             The starting line of the function in the source code, by default 0
+        globals : dict[str, typing.Any] | None, optional
+            The globals of the function, by default None
         """
         super().__init__()
         self.filename = str(filename)
@@ -128,6 +135,16 @@ class BreakAllTransformer(ast.NodeTransformer):
         "(internal) The functions in the scope in definition order"
         self._lambdas_names: dict[ast.Lambda, str] = {}
         "(internal) The last lambda assignments in the scope"
+
+        self.aliases: set[str] = {
+            name for name, value in (globals or {}).items() if value is enable_breakall
+        }
+        """(internal) The aliases for the `enable_breakall` decorator in the scope"""
+
+        # The default name also needs to be added to the aliases
+        # for locally imported `enable_breakall` to work
+        # The only caveat is that locally defined aliases won't work
+        self.aliases.add(enable_breakall.__name__)
 
     @same_location
     def visit_def(self, node: DefinedFunctionType) -> ast.AST:  # pyright: ignore[reportIncompatibleMethodOverride]
@@ -148,7 +165,8 @@ class BreakAllTransformer(ast.NodeTransformer):
         for decorator in node.decorator_list:
             if (
                 isinstance(decorator, ast.Name)
-                and decorator.id == enable_breakall.__name__
+                # and decorator.id == enable_breakall.__name__
+                and decorator.id in self.aliases
             ):
                 break
             decorators.append(decorator)
@@ -322,13 +340,14 @@ class BreakAllTransformer(ast.NodeTransformer):
         """
         # If the `breakall` statement also has a break count
         if isinstance(node.target, ast.Name) and node.target.id == "breakall":
-            # Check if the annotation is a constant or a simple unary operation on a constant
+            # Check if the annotation is a constant or
+            # a simple unary operation on a constant
             is_static_value = isinstance(node.annotation, ast.Constant) or (
                 isinstance(node.annotation, ast.UnaryOp)
                 and isinstance(node.annotation.op, (ast.UAdd, ast.USub))
                 and isinstance(node.annotation.operand, ast.Constant)
             )
-            
+
             if not is_static_value:
                 # Any loop up until this point can be broken
                 self._usage.update(range(1, self._loop_counter + 1))
@@ -434,13 +453,14 @@ class BreakAllTransformer(ast.NodeTransformer):
                     parsed_break_count = int(node.annotation.value)  # pyright: ignore[reportArgumentType]
                 elif isinstance(node.annotation, ast.UnaryOp):
                     # Handle negative/positive numbers like -1, +2, etc.
-                    operand_value = int(node.annotation.operand.value)  # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
+                    operand_value = int(node.annotation.operand.value)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportArgumentType]
                     if isinstance(node.annotation.op, ast.USub):
                         parsed_break_count = -operand_value
                     else:  # UAdd
                         parsed_break_count = operand_value
                 else:
-                    raise ValueError("Unexpected annotation type")
+                    msg = "Unexpected annotation type"
+                    raise TypeError(msg)  # noqa: TRY301
             except Exception as exc:
                 annotation_str = ast.unparse(node.annotation)
                 raise BreakAllSyntaxError.from_node(
@@ -752,6 +772,7 @@ def fix_source(
     source: str,
     filename: str = "<string>",
     start_line: int = 0,
+    globals: dict[str, typing.Any] | None = None,  # noqa: A002
 ) -> ast.Module:
     """
     Fix the source code by replacing all "breakall" with a way to break all loops.
@@ -792,6 +813,8 @@ def fix_source(
         The filename of the source code, by default "<string>"
     start_line : int, optional
         The starting line of the function in the source code, by default 0
+    globals : dict[str, typing.Any] | None, optional
+        The globals of the function to check for `enable_breakall` aliases
 
     Returns
     -------
@@ -801,7 +824,9 @@ def fix_source(
     tree = ast.parse(source)
     # Avoid having big stack traces for a SyntaxError on the user's side
     sys.excepthook = exception_hook
-    tree = BreakAllTransformer(filename=filename, start_line=start_line).visit(tree)
+    tree = BreakAllTransformer(
+        filename=filename, start_line=start_line, globals=globals
+    ).visit(tree)
     # Restore the previous behavior for performance reasons
     sys.excepthook = sys.__excepthook__
     ast.fix_missing_locations(tree)
@@ -900,6 +925,7 @@ def enable_breakall(  # noqa: PLR0912
         finally:
             del frame
         return None
+
     # Gets the source code of the function
     try:
         source_lines, start_line = inspect.getsourcelines(func)
@@ -931,14 +957,25 @@ def enable_breakall(  # noqa: PLR0912
 
     # Fixes the source code
     filename = inspect.getsourcefile(func) or "<string>"
-    tree = fix_source(source, filename=filename, start_line=start_line)
+
+    try:
+        func_globals = func.__globals__
+    except AttributeError:
+        func_globals = None
+
+    tree = fix_source(
+        source,
+        filename=filename,
+        start_line=start_line,
+        globals=func_globals,
+    )
 
     # Compile the fixed source code
     compiled = compile(tree, filename, "exec")
 
     # Executes the compiled source code (module)
     output: dict[str, typing.Any] = {}
-    exec(compiled, func.__globals__, output)  # noqa: S102, pyright: ignore[reportUnknownArgumentType]
+    exec(compiled, func_globals, output)  # noqa: S102, pyright: ignore[reportUnknownArgumentType]
 
     # Gets the function from the module
     for name, obj in output.items():
