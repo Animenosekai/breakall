@@ -928,7 +928,7 @@ def enable_breakall(  # noqa: PLR0912
                 message="The previous frame could not be retrieved",
             )
         try:
-            for name, obj in prev_frame.f_globals.items():
+            for name, obj in prev_frame.f_globals.copy().items():
                 if callable(obj):
                     obj = typing.cast("SupportsBreakall[typing.Any]", obj)
                     obj.supports_breakall = False
