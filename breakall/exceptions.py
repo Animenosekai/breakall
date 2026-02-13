@@ -1,4 +1,5 @@
 """The module for the custom exceptions of the `breakall` statement"""
+
 import ast
 import sys
 import types
@@ -6,7 +7,6 @@ import typing
 
 
 class BreakAllError(Exception):
-
     def __init__(
         self,
         title: str,
@@ -34,7 +34,6 @@ class BreakAllError(Exception):
         error_length: int
         indicator: str, default = ^
         """
-
         self.title = str(title)
         self.message = str(message)
         self.filename = str(filename)
@@ -103,16 +102,19 @@ class BreakAllError(Exception):
                 f"{' ' * self.col_offset}{self.unparsed_node}",
                 f"{' ' * self.col_offset}{' ' * self.spacing}{self.indicator * self.error_length}",
                 self.message,
-            )
+            ),
         )
 
     __repr__ = build_error_body
 
+
 class BreakAllEnvironmentError(BreakAllError):
     """A custom environment error for the `breakall` statement"""
 
+
 class BreakAllSyntaxError(BreakAllError, SyntaxError):
     """A custom syntax error for the `breakall` statement"""
+
 
 class BreakAllRuntimeError(BreakAllError, RuntimeError):
     """A custom runtime error for the `breakall` statement"""
@@ -123,7 +125,7 @@ def exception_hook(
     value: BaseException,
     traceback: types.TracebackType | None,
     /,
-):
+) -> None:
     """
     The exception hook for the `BreakAllSyntaxError` exception,
     which is used to avoid having big stack traces for a SyntaxError
@@ -146,4 +148,3 @@ def exception_hook(
         # Raised for example if for some reason `exctype` is not a type
         pass
     sys.__excepthook__(exctype, value, traceback)
-

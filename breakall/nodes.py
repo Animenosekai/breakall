@@ -1,4 +1,5 @@
 """Module to handle AST nodes"""
+
 import ast
 import typing
 
@@ -52,10 +53,12 @@ def copy_location(
 
 def same_location(
     func: typing.Callable[
-        [typing.Any, SourceASTNode], typing.Union[typing.List[TargetASTNode], TargetASTNode]
-    ]
+        [typing.Any, SourceASTNode],
+        typing.Union[typing.List[TargetASTNode], TargetASTNode],
+    ],
 ) -> typing.Callable[
-    [typing.Any, SourceASTNode], typing.Union[typing.List[TargetASTNode], TargetASTNode]
+    [typing.Any, SourceASTNode],
+    typing.Union[typing.List[TargetASTNode], TargetASTNode],
 ]:
     """
     Decorator to copy the location of the first argument to the return value
@@ -87,4 +90,3 @@ def same_location(
         return result
 
     return wrapper
-

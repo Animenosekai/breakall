@@ -3,11 +3,14 @@
 import ast
 import inspect
 import sys
-import warnings
 import typing
+import warnings
 
-from breakall.exceptions import (BreakAllEnvironmentError, BreakAllSyntaxError,
-                                 exception_hook)
+from breakall.exceptions import (
+    BreakAllEnvironmentError,
+    BreakAllSyntaxError,
+    exception_hook,
+)
 from breakall.nodes import same_location
 
 # This is here only to make type checkers happy
@@ -15,7 +18,9 @@ breakall = "breakall"
 "The `breakall` statement. You can import this to make the type checkers happy."
 # Type definitions
 DefinedFunctionType = typing.TypeVar(
-    "DefinedFunctionType", ast.FunctionDef, ast.AsyncFunctionDef
+    "DefinedFunctionType",
+    ast.FunctionDef,
+    ast.AsyncFunctionDef,
 )
 "The type of the defined function in the AST"
 LoopType = typing.Union[ast.For, ast.While, ast.AsyncFor]
@@ -26,13 +31,13 @@ class BreakAllTransformer(ast.NodeTransformer):
     """
     A node transformer which fixes the source code by replacing all "breakall" with a way to break multiple loops at once.
 
-    Note
+    Note:
     ----
     ... breakall # break all loops
     ... breakall: 2 # break 2 loops
     ... breakall: 1 # same as `break`
 
-    Example
+    Example:
     -------
     >>> source = '''
     ... for i in range(10):
@@ -50,7 +55,7 @@ class BreakAllTransformer(ast.NodeTransformer):
     except 1@breakall:
         pass
 
-    Raises
+    Raises:
     ------
     BreakAllSyntaxError.from_node
     BreakAllSyntaxError
@@ -134,7 +139,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         self._functions.pop()
         return node
 
-    @same_location # type: ignore
+    @same_location  # type: ignore
     def visit_Loop(self, node: LoopType) -> visit_Loop_ReturnType:
         """
         Parameters
@@ -148,7 +153,7 @@ class BreakAllTransformer(ast.NodeTransformer):
         """
         self._loop_counter += 1
         loop_body: typing.Union[ast.stmt, typing.List[ast.stmt]] = self.generic_visit(
-            node
+            node,
         )
         result: BreakAllTransformer.visit_Loop_ReturnType
         if self._loop_counter in self._usage:
@@ -159,7 +164,8 @@ class BreakAllTransformer(ast.NodeTransformer):
                     args=[
                         ast.Constant("breakall"),
                         ast.Tuple(
-                            elts=[ast.Name("Exception", ast.Load())], ctx=ast.Load()
+                            elts=[ast.Name("Exception", ast.Load())],
+                            ctx=ast.Load(),
                         ),
                         ast.Dict(keys=[], values=[]),
                     ],
@@ -173,7 +179,7 @@ class BreakAllTransformer(ast.NodeTransformer):
                         type=ast.Name(f"{self._loop_counter}@breakall", ast.Load()),
                         name=None,
                         body=[ast.Pass()],
-                    )
+                    ),
                 ],
                 orelse=[],
                 finalbody=[],
@@ -224,7 +230,8 @@ class BreakAllTransformer(ast.NodeTransformer):
 
     @same_location
     def visit_AnnAssign(
-        self, node: ast.AnnAssign
+        self,
+        node: ast.AnnAssign,
     ) -> typing.Union[ast.AST | typing.List[ast.AST]]:
         """
         Support for the `breakall` statement with a break count.
@@ -285,66 +292,69 @@ class BreakAllTransformer(ast.NodeTransformer):
                                             args=[],
                                             keywords=[
                                                 ast.keyword(
-                                                    arg="count", value=node.annotation
+                                                    arg="count",
+                                                    value=node.annotation,
                                                 ),
                                                 ast.keyword(
                                                     arg="current_loop",
                                                     value=ast.Constant(
-                                                        value=self._loop_counter
+                                                        value=self._loop_counter,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="filename",
                                                     value=ast.Constant(
-                                                        value=self.filename
+                                                        value=self.filename,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="line",
                                                     value=ast.Constant(
                                                         value=node.lineno
-                                                        + self.start_line
+                                                        + self.start_line,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="function",
                                                     value=ast.Constant(
-                                                        value=".".join(self._functions)
+                                                        value=".".join(self._functions),
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="col_offset",
                                                     value=ast.Constant(
-                                                        value=node.col_offset
+                                                        value=node.col_offset,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="spacing",
                                                     value=ast.Constant(
-                                                        value=len(node.target.id) + 2
+                                                        value=len(node.target.id) + 2,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="unparsed_node",
                                                     value=ast.Constant(
-                                                        value=ast.unparse(node)
+                                                        value=ast.unparse(node),
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="error_length",
                                                     value=ast.Constant(
                                                         value=len(
-                                                            ast.unparse(node.annotation)
-                                                        )
+                                                            ast.unparse(
+                                                                node.annotation,
+                                                            ),
+                                                        ),
                                                     ),
                                                 ),
                                             ],
                                         ),
-                                    )
+                                    ),
                                 ],
                             ),
                             ctx=ast.Load(),
-                        )
+                        ),
                     ),
                 ]
             try:
@@ -392,13 +402,14 @@ class BreakAllTransformer(ast.NodeTransformer):
                 ),
                 cause=None,
             )
-        elif isinstance(node.value, ast.Lambda) and isinstance(node.target, ast.Name):
+        if isinstance(node.value, ast.Lambda) and isinstance(node.target, ast.Name):
             self._lambdas_names[node.value] = node.target.id
         return self.generic_visit(node)
 
     @same_location
     def visit_Expr(
-        self, node: ast.Expr
+        self,
+        node: ast.Expr,
     ) -> typing.Union[ast.AST | typing.List[ast.AST]]:
         """
         Parameters
@@ -421,7 +432,9 @@ class BreakAllTransformer(ast.NodeTransformer):
             self._usage.add(1)
             return ast.Raise(
                 exc=ast.Call(
-                    func=ast.Name(f"1@breakall", ast.Load()), args=[], keywords=[]
+                    func=ast.Name("1@breakall", ast.Load()),
+                    args=[],
+                    keywords=[],
                 ),
                 cause=None,
             )
@@ -431,10 +444,12 @@ class BreakAllTransformer(ast.NodeTransformer):
                 and node.value.operand.id == "breakall"
             ):
                 OPERATOR_REPR: typing.Dict[
-                    typing.Type[typing.Union[ast.operator, ast.unaryop]], str
+                    typing.Type[typing.Union[ast.operator, ast.unaryop]],
+                    str,
                 ] = {ast.UAdd: "+", ast.USub: "-", ast.Not: "not", ast.Invert: "~"}
                 operator_repr = OPERATOR_REPR.get(
-                    type(node.value.op), ast.unparse(node.value.op)
+                    type(node.value.op),
+                    ast.unparse(node.value.op),
                 )
                 raise BreakAllSyntaxError.from_node(
                     title="Invalid break operation",
@@ -511,66 +526,67 @@ class BreakAllTransformer(ast.NodeTransformer):
                                             args=[],
                                             keywords=[
                                                 ast.keyword(
-                                                    arg="loop", value=value.right
+                                                    arg="loop",
+                                                    value=value.right,
                                                 ),
                                                 ast.keyword(
                                                     arg="current_loop",
                                                     value=ast.Constant(
-                                                        value=self._loop_counter
+                                                        value=self._loop_counter,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="filename",
                                                     value=ast.Constant(
-                                                        value=self.filename
+                                                        value=self.filename,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="line",
                                                     value=ast.Constant(
                                                         value=node.lineno
-                                                        + self.start_line
+                                                        + self.start_line,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="function",
                                                     value=ast.Constant(
-                                                        value=".".join(self._functions)
+                                                        value=".".join(self._functions),
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="col_offset",
                                                     value=ast.Constant(
-                                                        value=node.col_offset
+                                                        value=node.col_offset,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="spacing",
                                                     value=ast.Constant(
-                                                        value=len(value.left.id) + 3
+                                                        value=len(value.left.id) + 3,
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="unparsed_node",
                                                     value=ast.Constant(
-                                                        value=ast.unparse(value)
+                                                        value=ast.unparse(value),
                                                     ),
                                                 ),
                                                 ast.keyword(
                                                     arg="error_length",
                                                     value=ast.Constant(
                                                         value=len(
-                                                            ast.unparse(value.right)
-                                                        )
+                                                            ast.unparse(value.right),
+                                                        ),
                                                     ),
                                                 ),
                                             ],
                                         ),
-                                    )
+                                    ),
                                 ],
                             ),
                             ctx=ast.Load(),
-                        )
+                        ),
                     ),
                 ]
             try:
@@ -613,13 +629,16 @@ class BreakAllTransformer(ast.NodeTransformer):
                 )
             self._usage.add(parsed_loop_number)
             return ast.Raise(
-                exc=ast.Name(f"{parsed_loop_number}@breakall", ast.Load()), cause=None
+                exc=ast.Name(f"{parsed_loop_number}@breakall", ast.Load()),
+                cause=None,
             )
         return self.generic_visit(node)
 
 
 def fix_source(
-    source: str, filename: str = "<string>", start_line: int = 0
+    source: str,
+    filename: str = "<string>",
+    start_line: int = 0,
 ) -> ast.Module:
     """
     Fixes the source code by replacing all "breakall" with a way to break all loops.
@@ -724,7 +743,7 @@ def enable_breakall(func: typing.Optional[typing.Callable] = None):
                         )
         finally:
             del frame
-        return
+        return None
     # Gets the source code of the function
     try:
         source_lines, start_line = inspect.getsourcelines(func)
@@ -790,4 +809,3 @@ def supports_breakall(func: typing.Callable):
     """
     # Maybe also check the AST
     return hasattr(func, "supports_breakall") and func.supports_breakall
-

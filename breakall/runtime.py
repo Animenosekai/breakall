@@ -154,4 +154,3 @@ def destination_from_loop_number(
             indicator=indicator,
         )
     return parsed
-

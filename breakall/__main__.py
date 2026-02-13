@@ -10,7 +10,7 @@ import breakall
 GLOBAL_ENV = {"breakall": breakall, "__name__": "__main__"}
 
 
-def main(file: pathlib.Path, output: typing.Optional[str] = None):
+def main(file: pathlib.Path, output: typing.Optional[str] = None) -> None:
     """
     Parameters
     ----------
@@ -18,7 +18,7 @@ def main(file: pathlib.Path, output: typing.Optional[str] = None):
     output: NoneType | str, default = None
     """
     # Reading the source code
-    with open(file, "r") as f:
+    with open(file) as f:
         source = f.read()
     # Parsing it
     tree = ast.parse(source)
@@ -30,7 +30,7 @@ def main(file: pathlib.Path, output: typing.Optional[str] = None):
                     value=ast.Name(id="breakall", ctx=ast.Load()),
                     attr="enable_breakall",
                     ctx=ast.Load(),
-                )
+                ),
             )
     tree = ast.fix_missing_locations(tree)
     # Compiling and executing the code
@@ -46,10 +46,11 @@ def main(file: pathlib.Path, output: typing.Optional[str] = None):
                 f.write(result)
 
 
-def entry():
+def entry() -> None:
     """The main entry point of the module"""
     parser = argparse.ArgumentParser(
-        prog="breakall", description="Break from multiple loops at once in Python"
+        prog="breakall",
+        description="Break from multiple loops at once in Python",
     )
     parser.add_argument("file", help="The file to run", type=pathlib.Path)
     # parser.add_argument(
@@ -64,4 +65,3 @@ def entry():
     )
     args = parser.parse_args()
     main(file=pathlib.Path(args.file), output=args.output)
-

@@ -1,52 +1,106 @@
-[tool.poetry]
+[project]
 name = "breakall"
 version = "1.0rc1"
 description = "Break from multiple loops at once in Python"
-license = "MIT License"
-authors = ["Animenosekai <animenosekai.mail@gmail.com>"]
-maintainers = ["Animenosekai <animenosekai.mail@gmail.com>"]
+authors = [{ name = "Animenosekai", email = "animenosekai.mail@gmail.com" }]
+maintainers = [{ name = "Animenosekai", email = "animenosekai.mail@gmail.com" }]
+license = { text = "MIT" }
 readme = "README.md"
-repository = "https://github.com/Animenosekai/breakall"
-documentation = "https://github.com/Animenosekai/breakall/blob/main/README.md"
+requires-python = ">=3.9"
 keywords = ["animenosekai", "breakall", "loops", "break"]
 classifiers = [
-    # Status
-    "Development Status :: 3 - Alpha",
-
-    # Audience
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-
-    # Licensing
     "License :: OSI Approved :: MIT License",
-
-    # Software Requirements
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-
-    # Code quality
     "Typing :: Typed",
 ]
+dependencies = []
 
-[tool.poetry.dependencies]
-python = "^3.9"
+[project.optional-dependencies]
+dev = ["mypy>=1.11", "pytest-asyncio>=0.24"]
 
-[tool.poetry.scripts]
-breakall = 'breakall.__main__:entry'
+[project.scripts]
+breakall = "breakall.__main__:entry"
 
-[tool.poetry.urls]
+[project.urls]
+Repository = "https://github.com/Animenosekai/breakall"
+Documentation = "https://github.com/Animenosekai/breakall/blob/main/README.md"
 "Issue Tracker" = "https://github.com/Animenosekai/breakall/issues"
 
-[tool.poetry.group.dev.dependencies]
-mypy = "^1.11"
-pytest-asyncio = "^0.24"
+[tool.coverage.run]
+omit = ["**/site-packages/**", "tests/**"]
+
+
+#################################
+# Linter Configuration
+#################################
+
+[tool.mypy]
+show_error_context = true
+show_column_numbers = true
+show_error_code_links = true
+pretty = true
+strict = true
+plugins = ['pydantic.mypy']
+
+# Disallows
+disallow_any_unimported = true
+disallow_any_expr = false      # Conflicts with the fact that routes return a Coroutine with an `Any` type in its definition
+disallow_any_decorated = true
+disallow_any_explicit = true
+
+# Warnings
+warn_no_return = true
+warn_unreachable = true
+warn_incomplete_stub = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D400", # ends-in-period: Checks for docstrings in which the first line does not end in a period.
+    "D415", # ends-in-punctuation: Checks for docstrings in which the first line does not end in a punctuation mark, such as a period, question mark, or exclamation point.
+    "ERA001", # commented-out-code: Checks for commented-out Python code.
+    "PLR0913", # too-many-arguments: Checks for function definitions that include too many arguments. The default maximum is 5.
+    "C901", # complex-structure: Checks for functions with a high McCabe complexity.
+    "FIX002", # line-contains-todo: Checks for "TODO" comments.
+    "D212", # multi-line-summary-first-line: Checks for docstring summary lines that are not positioned on the first physical line of the docstring.
+    "D203", # one-blank-line-before-class: Checks for docstrings on class definitions that are not preceded by a blank line.
+    "D413", # blank-line-after-last-section: Checks for missing blank lines after the last section of a multiline docstring.
+    "TD003", # missing-todo-link: Checks that a TODO comment is associated with a link to a relevant issue or ticket.
+]
+extend-safe-fixes = ["D200", "TID252", "ANN201"]
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.pyright]
+strict = ["**/*.py"]
+
+# Enabling more rules
+reportCallInDefaultInitializer = "warning"
+reportImplicitOverride = "warning"
+reportImportCycles = "warning"
+reportMissingSuperCall = "warning"
+reportPropertyTypeMismatch = "warning"
+reportShadowedImports = "warning"
+reportUninitializedInstanceVariable = "warning"
+
+# Disabling rules
+reportUnnecessaryTypeIgnoreComment = "none" # Conflicts with mypy
+reportImplicitStringConcatenation = "none"
+reportUnusedCallResult = "none"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.coverage.run]
-omit = [
-    "**/site-packages/**",
-    "tests/**"
-]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
