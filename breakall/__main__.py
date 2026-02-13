@@ -110,7 +110,7 @@ class BreakallLoader(importlib.abc.Loader):
 
         # If we got source code, transform it
         if source:
-            tree = ast.parse(source)
+            tree = ast.parse(typing.cast(str, source))
             # Add the enable_breakall decorator to functions
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
