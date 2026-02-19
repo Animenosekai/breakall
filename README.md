@@ -34,6 +34,8 @@
   - [`breakall`](#breakall-1)
   - [`breakall: n`](#breakall-n)
   - [`breakall @ n`](#breakall--n)
+  - [Dynamic Loop Breaking](#dynamic-loop-breaking)
+  - [Error handling](#error-handling)
 - [Linter and Type Checker Configuration](#linter-and-type-checker-configuration)
   - [Importing breakall](#importing-breakall)
   - [Ruff](#ruff)
@@ -207,6 +209,114 @@ In this example, `breakall @ 2` targets loop 2 (the `j` loop), so it breaks from
 
 > [!NOTE]
 > The `breakall @ n` keyword is 1-indexed, where 1 is the innermost loop
+
+### Dynamic Loop Breaking
+
+You can also use a variable to determine how many loops to break from:
+
+```python
+>>> from breakall import enable_breakall
+>>>
+>>> @enable_breakall
+... def test():
+...     n = 2
+...     for i in range(3):
+...         for j in range(3):
+...             for k in range(3):
+...                 breakall @ n # breakall: n also works
+...                 print("Shouldn't print")
+...             print("Shouldn't print")
+...         print("Should print")
+...     print("Done")
+>>>
+>>> test()
+Should print
+Should print
+Should print
+Done
+```
+
+You can even perform calculations in the loop breaking statement:
+
+```python
+>>> from breakall import enable_breakall
+>>>
+>>>
+>>> @enable_breakall
+>>> def test():
+...     for i in range(3):
+...         for j in range(3):
+...             for k in range(3):
+...                 breakall: 1 + 2
+...                 print("Shouldn't print")
+...             print("Shouldn't print")
+...         print("Shouldn't print")
+...     print("Done")
+>>>
+>>>
+>>> test()
+Done
+```
+
+### Error handling
+
+All errors originating from an invalid use of `breakall` all inherit `BreakAllError`.
+
+There are three types of errors:
+
+- `BreakAllEnvironmentError` : When the `enable_breakall` couldn't properly transform the function (keep in mind that `enable_breakall` needs to have access to the function's source code to transform it)
+- `BreakAllSyntaxError` : When the `breakall` statement is used with invalid syntax, such as an invalid loop number or break count
+- `BreakAllRuntimeError` : When the `breakall` statement is used with a valid syntax but results in an invalid loop number or break count at runtime, such as when using a variable that is out of range or a calculation that results in an invalid loop number or break count
+
+It even gives you proper error messages
+
+```python
+# breakall @ 4
+BreakAllSyntaxError: Invalid loop number
+File ".../test.py", line 7, in test
+                breakall @ 4
+                           ^
+There are only 3 loops to break up until this point. Note that it is impossible to break to a loop defined later. (test.py)
+
+# breakall: 4
+BreakAllSyntaxError: Invalid break count
+File ".../test.py", line 7, in test
+                breakall: 4
+                          ^
+There are only 3 loops to break. (test.py)
+```
+
+```python
+# When `n` is too small
+Traceback (most recent call last):
+  File ".../test.py", line 17, in <module>
+    test()
+  File ".../test.py", line 7, in test
+    for i in range(3):
+  File ".../breakall/runtime.py", line 170, in destination_from_loop_number
+    raise BreakAllRuntimeError(
+breakall.exceptions.BreakAllRuntimeError: Invalid loop number
+File ".../test.py", line 11, in test
+                breakall @ n
+                           ^
+The loop number must be greater than 0
+```
+
+```python
+# When using a calculation that results in an invalid loop number or break count
+Traceback (most recent call last):
+  File ".../test.py", line 17, in <module>
+    test()
+  File ".../test.py", line 7, in test
+    for i in range(3):
+  File ".../breakall/runtime.py", line 88, in destination_from_break_count
+    raise BreakAllRuntimeError(
+breakall.exceptions.BreakAllRuntimeError: Invalid break count
+File ".../test.py", line 11, in test
+                breakall: 1 + 3
+                          ^^^^^
+There are only 3 loops to break.
+```
 
 ## Linter and Type Checker Configuration
 
